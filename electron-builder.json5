@@ -1,0 +1,34 @@
+/**
+ * @see https://www.electron.build/configuration/configuration
+ */
+{
+  appId: 'com.motionprinter.app',
+  productName: 'MotionPrinter',
+  copyright: 'Copyright © 2024 Abu Sufiyan',
+  asar: true,
+  icon: 'public/favicon.ico',
+  directories: {
+    output: 'release/${version}',
+  },
+  files: ['dist-electron', 'dist'],
+  mac: {
+    artifactName: 'MotionPrinter_${version}.${ext}',
+    target: ['dmg'],
+  },
+  win: {
+    publisherName: 'Abu Sufiyan from MotionPrinter',
+    target: [
+      {
+        target: 'nsis',
+        arch: ['x64'],
+      },
+    ],
+    artifactName: 'MotionPrinter_${version}.${ext}',
+  },
+  nsis: {
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+    deleteAppDataOnUninstall: true,
+  },
+}

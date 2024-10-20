@@ -1,0 +1,12 @@
+
+1.0.1
+* Removed authors name from footer
+* added Help Navigation
+  * Added FAQs component
+  * Added Help component
+* Features:
+  1. Merging paper support sizes with printer support sizes in print dialog
+  2. Custom page validation supports
+
+1.0.0
+Initial release version

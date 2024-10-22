@@ -17,6 +17,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Home' }
   },
   {
+    path: '/inbox',
+    name: 'inbox',
+    component: () => import('../views/inboxPage.vue'),
+    meta: { title: 'Inbox' }
+  },
+  {
     path: '/history',
     name: 'history',
     component: () => import('../views/HistoryPage.vue'),

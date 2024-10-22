@@ -3,8 +3,8 @@ import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import { useLordStore } from '../stores/LordStore';
 import ip from 'ip'
-import { HomeIcon, CountdownTimerIcon, TokensIcon } from '@radix-icons/vue'
-import { Network, BadgeHelp } from 'lucide-vue-next';
+import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatIcon } from '@radix-icons/vue'
+import { Network, BadgeHelp, MessageCircle  } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
 
@@ -12,8 +12,9 @@ import { ipcRenderer } from 'electron';
 
 const routes = ref([
   { path: '/home', display: 'Home' },
-  { path: '/history', display: 'History' },
+  { path: '/inbox', display: 'Inbox' },
   { path: '/connected-pc', display: 'Connected PC' },
+  { path: '/history', display: 'History' },
   { path: '/help', display: 'Help' },
 ])
 
@@ -59,6 +60,7 @@ aside.top-0.left-0.fixed
           `
         )
           HomeIcon(v-if="r.path == '/home'")
+          MessageCircle(stroke-width="1" size="16" color="black" v-else-if="r.path == '/inbox'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           Network(stroke-width="1" size="16" color="black" v-else-if="r.path == '/connected-pc'")
           BadgeHelp(stroke-width="1" size="16" color="black" v-else-if="r.path == '/help'")

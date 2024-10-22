@@ -3,7 +3,7 @@ const animate = require('tailwindcss-animate');
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
-  content: ['./src/**/*.{ts,tsx,vue}'],
+  content: ['./src/**/*.{ts,tsx,vue}', './node_modules/flowbite/**/*.js'],
   prefix: '',
   theme: {
     container: {
@@ -30,5 +30,5 @@ module.exports = {
       },
     },
   },
-  plugins: [animate],
+  plugins: [animate, require('flowbite/plugin')],
 };

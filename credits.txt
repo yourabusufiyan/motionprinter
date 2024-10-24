@@ -1,0 +1,24 @@
+=== MotionPrinter ===
+Contributors : yourabusufiyan
+Donate link: paypal.me/yourabusufiyan
+Author:  Abu Sufiyan
+Author URI: https://github.com/yourabusufiyan/
+
+
+MotionPrinter bundles the following third-party resources:
+
+Vue 3
+License: MIT-licensed open source
+Source: https://vuejs.org/
+
+Tailwind CSS
+License: MIT-licensed open source
+Source: https://github.com/tailwindlabs/tailwindcss
+
+Shadcn-vue
+License: MIT-licensed open source
+Source: https://github.com/unovue/shadcn-vue
+
+Express
+License: MIT-licensed open source
+Source: https://expressjs.com/

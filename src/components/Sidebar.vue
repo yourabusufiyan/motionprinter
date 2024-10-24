@@ -3,12 +3,10 @@ import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router';
 import { useLordStore } from '../stores/LordStore';
 import ip from 'ip'
-import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatIcon } from '@radix-icons/vue'
-import { Network, BadgeHelp, MessageCircle  } from 'lucide-vue-next';
+import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatBubbleIcon } from '@radix-icons/vue'
+import { Network, BadgeHelp } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
-
-
 
 const routes = ref([
   { path: '/home', display: 'Home' },
@@ -21,7 +19,7 @@ const routes = ref([
 const route = useRoute()
 const lordStore = useLordStore()
 const localIP = ip.address()
-const version = ref('sdfsdf')
+const version = ref('1.0.0')
 
 
 onMounted(async () => {
@@ -39,7 +37,6 @@ aside.top-0.left-0.fixed
       h1.text-2xl.font-medium(
         class="dark:text-slate-100"
       )
-        //- img.w-auto.h-7(src="https://merakiui.com/images/logo.svg", alt)
         | MotionPrinter
         code.text-xs.block.text-gray-500.m-0.p-0 Beta {{ version }}
       p.text-sm.text-zinc-600.leading-tight.mt-1(
@@ -60,14 +57,15 @@ aside.top-0.left-0.fixed
           `
         )
           HomeIcon(v-if="r.path == '/home'")
-          MessageCircle(stroke-width="1" size="16" color="black" v-else-if="r.path == '/inbox'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           Network(stroke-width="1" size="16" color="black" v-else-if="r.path == '/connected-pc'")
           BadgeHelp(stroke-width="1" size="16" color="black" v-else-if="r.path == '/help'")
+          ChatBubbleIcon(stroke-width="2" size="16" color="black" v-else-if="r.path == '/inbox'")
           span.mx-2.text-sm.font-medium
             | {{ r.display }}
 
       .mt-6(class="sm:mt-3")
+
         .p-3.bg-slate-100.rounded-lg.pt-2.hidden(class="dark:bg-slate-800")
           h2.text-sm.font-medium.text-slate-800(class="dark:text-white")
             | Sponsored
@@ -76,6 +74,7 @@ aside.top-0.left-0.fixed
             alt="sponsored logo"
             class="md:h-32"
           )
+
         .mt-6(class="sm:mt-3")
 
           .small-nav.text-xs.font-semibold
@@ -90,4 +89,5 @@ aside.top-0.left-0.fixed
             span.text-sm.font-medium.text-slate-700(
               class="dark:text-slate-200"
             ) {{ lordStore?.db?.computerName }} : {{ localIP }}
+
 </template>

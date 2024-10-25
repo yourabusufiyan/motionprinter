@@ -67,7 +67,7 @@ onMounted(() => {
   axios.get('https://motionprinter.pages.dev/info.json').then(async (response) => {
     console.log('[App.vue] .... ... .',)
 
-    if (compare(response.data.version, await ipcRenderer.invoke('version') as string, '>')) {
+    if (compare(response.data.version || '1.0.0', await ipcRenderer.invoke('version') as string, '>')) {
       console.log('New version available...')
       isAlertOpen.value = true;
     }

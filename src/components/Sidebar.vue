@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useLordStore } from '../stores/LordStore';
 import ip from 'ip'
 import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatBubbleIcon } from '@radix-icons/vue'
-import { Network, BadgeHelp } from 'lucide-vue-next';
+import { Network } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
 
@@ -13,7 +13,6 @@ const routes = ref([
   { path: '/inbox', display: 'Inbox' },
   { path: '/connected-pc', display: 'Connected PC' },
   { path: '/history', display: 'History' },
-  { path: '/help', display: 'Help' },
 ])
 
 const route = useRoute()
@@ -59,7 +58,6 @@ aside.top-0.left-0.fixed
           HomeIcon(v-if="r.path == '/home'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           Network(stroke-width="1" size="16" color="black" v-else-if="r.path == '/connected-pc'")
-          BadgeHelp(stroke-width="1" size="16" color="black" v-else-if="r.path == '/help'")
           ChatBubbleIcon(stroke-width="2" size="16" color="black" v-else-if="r.path == '/inbox'")
           span.mx-2.text-sm.font-medium
             | {{ r.display }}
@@ -77,8 +75,9 @@ aside.top-0.left-0.fixed
 
         .mt-6(class="sm:mt-3")
 
-          .small-nav.text-xs.font-semibold
-            router-link( to="/help#faq" class="hover:underline") FAQs
+          .small-nav.text-xs.font-semibold(class="space-x-1.5")
+            router-link( to="/help" class="underline hover:no-underline") HELP
+            router-link( to="/help#faq" class="underline hover:no-underline") FAQs
 
           .flex.items-center.gap-x-2
             a.hidden(href="#")

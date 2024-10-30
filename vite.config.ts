@@ -39,16 +39,6 @@ export default defineConfig({
     }),
 
     electron([
-      // {
-      //   entry: 'node_modules/electron-store/index.js',
-      //   vite: {
-      //     build: {
-      //       sourcemap: isDevelopment,
-      //       minify: isProduction,
-      //       outDir: 'dist-electron/',
-      //     }
-      //   }
-      // },
       {
         // Main-Process entry file of the Electron App.
         entry: 'electron/main/index.ts',
@@ -101,7 +91,7 @@ export default defineConfig({
 
     // Use Node.js API in the Renderer-process
     renderer({
-      nodeIntegration: true,
+      nodeIntegration: true
     }),
   ],
 

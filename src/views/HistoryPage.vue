@@ -1,3 +1,76 @@
+<script lang="ts" setup>
+import moment from 'moment'
+import { chunk, fill, sortBy } from 'lodash'
+import { ref, computed, reactive } from 'vue'
+
+import { useLordStore } from '../stores/LordStore';
+import { humanFileSize } from './../utils/short-functions'
+
+import type { $toPrintsCommandsFile, $lordData } from './../declarations'
+
+
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from './../components/ui/select'
+
+const lordStore = useLordStore();
+const numberOfColumnsToDisplay = ref(10)
+const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.db?.toPrintsCommands, ['addedTime']).toReversed(), numberOfColumnsToDisplay.value))
+const currentPage = ref(0)
+const paginationNumbers = computed(() => {
+
+  if (pagination.value.length <= 7)
+    return fill(Array(pagination.value.length), 'a').map((el, i) => i);
+
+  if (currentPage.value <= 4) {
+    return fill(Array(7), 'a').map((el, i) => i)
+  } else if (currentPage.value >= pagination.value.length - 4) {
+    return fill(Array(pagination.value.length), 'a').splice(0, 7).map((el, i) => pagination.value.length - 1 - i).sort()
+  } else {
+    return [-3, -2, -1, 0, 1, 2, 3].map(el => currentPage.value + Number(el));
+  }
+
+})
+
+let selectedItems = ref<$toPrintsCommandsFile[]>([])
+const isAllSelected = computed<boolean>(() => selectedItems.value.length == numberOfColumnsToDisplay.value)
+
+function selectAllItems() {
+  console.log("selectAllItems")
+  if (isAllSelected.value) {
+    console.log("isAllSelected is true", isAllSelected.value)
+    selectedItems.value = []
+  } else {
+    console.log("isAllSelected", isAllSelected.value, pagination.value[currentPage.value])
+    selectedItems.value = pagination.value[currentPage.value]
+  }
+}
+
+function displayFileName(fileNames: string) {
+  var leftRightStrings = fileNames.split('.');
+  var fName = leftRightStrings[0];
+  var fExtension = leftRightStrings[1];
+  var lengthFname = fName.length;
+  //if file name without extension contains more than 15 characters
+  if (lengthFname > 40) {
+    return fName.substr(0, 26) + " ..... " + fName.substr(-4) + "." + fExtension;
+  }
+  return fileNames
+}
+
+
+onMounted(() => {
+  lordStore.reloadDatabase()
+})
+
+</script>
+
 <template lang="pug">
 .tasks-view
   .check-files-exits(v-if="lordStore.db?.toPrintsCommands?.length")
@@ -156,76 +229,3 @@
       ) There is no history...
 
 </template>
-
-<script lang="ts" setup>
-import moment from 'moment'
-import { chunk, fill, sortBy } from 'lodash'
-import { ref, computed, reactive } from 'vue'
-
-import { useLordStore } from '../stores/LordStore';
-import { humanFileSize } from './../utils/short-functions'
-
-import type { $toPrintsCommandsFile, $lordData } from './../declarations'
-
-
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from './../components/ui/select'
-
-const lordStore = useLordStore();
-const numberOfColumnsToDisplay = ref(10)
-const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.db?.toPrintsCommands, ['addedTime']).toReversed(), numberOfColumnsToDisplay.value))
-const currentPage = ref(0)
-const paginationNumbers = computed(() => {
-
-  if (pagination.value.length <= 7)
-    return fill(Array(pagination.value.length), 'a').map((el, i) => i);
-
-  if (currentPage.value <= 4) {
-    return fill(Array(7), 'a').map((el, i) => i)
-  } else if (currentPage.value >= pagination.value.length - 4) {
-    return fill(Array(pagination.value.length), 'a').splice(0, 7).map((el, i) => pagination.value.length - 1 - i).sort()
-  } else {
-    return [-3, -2, -1, 0, 1, 2, 3].map(el => currentPage.value + Number(el));
-  }
-
-})
-
-let selectedItems = ref<$toPrintsCommandsFile[]>([])
-const isAllSelected = computed<boolean>(() => selectedItems.value.length == numberOfColumnsToDisplay.value)
-
-function selectAllItems() {
-  console.log("selectAllItems")
-  if (isAllSelected.value) {
-    console.log("isAllSelected is true", isAllSelected.value)
-    selectedItems.value = []
-  } else {
-    console.log("isAllSelected", isAllSelected.value, pagination.value[currentPage.value])
-    selectedItems.value = pagination.value[currentPage.value]
-  }
-}
-
-function displayFileName(fileNames: string) {
-  var leftRightStrings = fileNames.split('.');
-  var fName = leftRightStrings[0];
-  var fExtension = leftRightStrings[1];
-  var lengthFname = fName.length;
-  //if file name without extension contains more than 15 characters
-  if (lengthFname > 40) {
-    return fName.substr(0, 26) + " ..... " + fName.substr(-4) + "." + fExtension;
-  }
-  return fileNames
-}
-
-
-onMounted(() => {
-  lordStore.reloadDatabase()
-})
-
-</script>

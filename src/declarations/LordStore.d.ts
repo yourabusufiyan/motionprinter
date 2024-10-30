@@ -1,6 +1,6 @@
 import { toDisplayString } from "vue";
 import type { Printer, } from "pdf-to-printer";
-import type { MutlerFileResp, toPrintsCommandsFile } from "../../electron/main/express-app-d"
+import type { toPrintsCommandsFile } from "../../electron/main/express-app-d"
 
 export type lordData = {
   id: string,

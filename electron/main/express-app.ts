@@ -13,7 +13,7 @@ import os from 'node:os'
 import { Low } from 'lowdb'
 import { JSONFileSyncPreset } from 'lowdb/node';
 import { getPrinters, getDefaultPrinter } from 'pdf-to-printer'
-import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy } from "lodash";
+import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy, omit } from "lodash";
 import ip from 'ip'
 import axios from 'axios'
 import fileUpload from 'express-fileupload'
@@ -27,6 +27,7 @@ import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
 
 import { app } from 'electron'
+import { Chat, Inbox } from "../../src/declarations/inbox";
 
 class expressAppClass {
 
@@ -41,11 +42,14 @@ class expressAppClass {
     join(os.homedir(), app.getName(), "./upload/"),
     join(os.homedir(), app.getName(), "./db/")
   ]
-  // crypto.pseudoRandomBytes
   static computerName: string | undefined = process.env.COMPUTERNAME
   static dbName: string = `lordPrinter-${this.ip}.json`
   static dbPath: string = join(this.dir[2], this.dbName)
   static db = JSONFileSyncPreset<lordData>(this.dbPath, this.defaultLordData());
+
+  static inboxDBPath: string = join(this.dir[2], expressAppClass.db.data.id.toString() + '.json')
+  static inboxDB = JSONFileSyncPreset<Inbox>(this.inboxDBPath, this.defaultInbox());
+
 
   static startListening(): void {
 
@@ -73,8 +77,18 @@ class expressAppClass {
     };
   }
 
-  static reloadDatabase(): void {
+  static defaultInbox(): Inbox {
+    return []
+  }
 
+  static reloadInbox(): void {
+    this.inboxDB = JSONFileSyncPreset<Inbox>(
+      join(this.dir[2], expressAppClass.db.data.id),
+      this.defaultInbox()
+    );
+  }
+
+  static reloadDatabase(): void {
     this.db = JSONFileSyncPreset<lordData>(this.dbPath, this.defaultLordData())
   }
 
@@ -204,6 +218,16 @@ class expressAppClass {
       if (req.body) {
 
       }
+    })
+    
+    this.router.get('/inbox', async (req, res) => {
+      let inboxesPC = this.inboxDB.data.map(el => el.id);
+      let newComputers = this.db.data.ConnectedPCs
+        .filter(el => !inboxesPC.includes(el.id))
+        .map(el => omit(el, ['printers', 'printersDefault', 'lastPrinted']))
+      res.json([...this.inboxDB.data, ...newComputers])
+      this.inboxDB.data = [...this.inboxDB.data, ...newComputers]
+      this.inboxDB.write()
     })
 
   }

@@ -27,7 +27,7 @@ import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
 
 import { app } from 'electron'
-import { Chat, Inbox } from "../../src/declarations/inbox";
+import { Chat, Inbox, Message } from "../../src/declarations/inbox";
 
 class expressAppClass {
 
@@ -173,7 +173,6 @@ class expressAppClass {
     this.router.get("/ping", (req: Request, res: Response) => res.send('pong'))
 
     this.router.get('/popo', (req, res) => {
-
       res.send(`<html>
                 <body>
                   <form ref='uploadForm'
@@ -203,23 +202,10 @@ class expressAppClass {
         res.status(400).send('Something went wrong. Please try again')
       });
     })
-    this.router.get('/defaultData', async (req, res) => {
-      res.json(this.defaultLordData())
-    })
-    this.router.get('/data', async (req, res) => {
-      res.json(this.db.data)
-    })
+    this.router.get('/defaultData', async (req, res) => res.json(this.defaultLordData()))
+    this.router.get('/data', async (req, res) => res.json(this.db.data))
     this.router.get('/profile', this.profileMethod)
     this.router.get('/connected-pc', this.connectedPCMethod)
-    this.router.get('/data', async (req, res) => {
-      res.json(this.db.data)
-    })
-    this.router.delete('/data', async (req, res) => {
-      if (req.body) {
-
-      }
-    })
-    
     this.router.get('/inbox', async (req, res) => {
       let inboxesPC = this.inboxDB.data.map(el => el.id);
       let newComputers = this.db.data.ConnectedPCs
@@ -228,6 +214,34 @@ class expressAppClass {
       res.json([...this.inboxDB.data, ...newComputers])
       this.inboxDB.data = [...this.inboxDB.data, ...newComputers]
       this.inboxDB.write()
+    })
+
+    this.router.post('/inbox/message', async (req, res) => {
+      console.log(req.body)
+      if (req.body) {
+        let newMessage: Message = {
+          id: uuidv7(),
+          chatId: req.body.chatId,
+          senderId: req.body.senderId as string,
+          message: req.body.message as string,
+          MessageType: req.body.messageType as string,
+          receivedAt: Date.now(),
+          sentAt: req.body?.messageType || null,
+          senderComputerName: req.body?.senderComputerName || '',
+          senderIP: req.body?.senderIP || '',
+        }
+        let chat = this.inboxDB.data.find(el => el.id === req.body.chatId)
+        if (chat) {
+          chat.messages = [...(chat?.messages || []), newMessage]
+          res.json(chat)
+          this.inboxDB.write()
+        } else {
+          res.status(400).send('Chat not found')
+        }
+      }
+    })
+    this.router.get('/inbox/message', async (req, res) => {
+      res.json({ status: 'success' })
     })
 
   }

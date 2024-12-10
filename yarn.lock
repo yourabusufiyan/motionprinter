@@ -681,6 +681,11 @@
     "@types/node" "*"
     "@types/send" "*"
 
+"@types/try-catch@^3.0.2":
+  version "3.0.2"
+  resolved "https://registry.npmjs.org/@types/try-catch/-/try-catch-3.0.2.tgz"
+  integrity sha512-KDwaMuAXVwD+QzGKU/BkLlT8s6zVitsH4LSNf6RQ7ZB7TZD82XFhcS/PEKHw0x7mE63xRNp55f8CCG14kdanlg==
+
 "@types/uuid@^10.0.0":
   version "10.0.0"
   resolved "https://registry.npmjs.org/@types/uuid/-/uuid-10.0.0.tgz"
@@ -4929,6 +4934,11 @@ truncate-utf8-bytes@^1.0.0:
   integrity sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ==
   dependencies:
     utf8-byte-length "^1.0.1"
+
+try-catch@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.npmjs.org/try-catch/-/try-catch-3.0.1.tgz"
+  integrity sha512-91yfXw1rr/P6oLpHSyHDOHm0vloVvUoo9FVdw8YwY05QjJQG9OT0LUxe2VRAzmHG+0CUOmI3nhxDUMLxDN/NEQ==
 
 ts-interface-checker@^0.1.9:
   version "0.1.13"

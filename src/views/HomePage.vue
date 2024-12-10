@@ -52,8 +52,4 @@ if (!lordStore.db.ConnectedPCs.length) {
   PrintDialog
 
 
-
-  
-
-
 </template>

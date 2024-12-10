@@ -57,12 +57,42 @@ async function loadComputers(force: boolean = false) {
 
 onMounted(loadComputers)
 
+const isRefreshed = ref(false);
+const isRefreshing = ref(false)
+const ipCounts = ref(20)
+const addresses = ref<Array<string>>([])
+const onlineComputers = ref<string[]>([])
+
+function getiplist() {
+  isRefreshing.value = true;
+  addresses.value = ip_to_sequence({ ip: '192.168.0.105', arraySize: isRefreshed.value ? +ipCounts.value + 10 : ipCounts.value })
+  addresses.value.map(async (ip: any, i: any) => {
+    axios.get(`http://${ip}:9457/api/v1/ping`)
+      .then((expiresAt) => {
+        onlineComputers.value.push(ip)
+        onlineComputers.value = uniq(onlineComputers.value)
+        console.log('checkPing : ', ip, ' : true')
+        return true
+      })
+      .catch((err) => {
+        console.log('checkPing : ', ip, ' : false')
+        return false;
+      }).finally(() => {
+        if (last(addresses.value) == ip) {
+          isRefreshing.value = false;
+        }
+      });
+    console.log(`http://${ip}:9457/api/v1/ping`)
+  })
+  isRefreshed.value = true;
+}
 
 </script>
 
 
 <template lang="pug">
     .connectedPC-container
+      pre {{ onlineComputers }}
 
       .reload-button-container.mb-8(
         :class="{'cursor-not-allowed': connectedPCSearching}"
@@ -76,6 +106,14 @@ onMounted(loadComputers)
           ReloadIcon.w-4.h-4.mr-2.animate-spin.mr-1(v-if="connectedPCSearching")
           | {{ refreshed ? 'Again' : '' }}
           | {{ connectedPCSearching ? 'Refreshing...' : 'Refresh' }}
+
+        uiButton(
+          @click="getiplist()"
+          :disabled="isRefreshing"
+        )
+          ReloadIcon.w-4.h-4.mr-2.animate-spin.mr-1(v-if="isRefreshing")
+          New Refresh
+      pre {{ isRefreshing }}
 
       Accordion(
         type="single" collapsible

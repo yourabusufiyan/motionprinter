@@ -19,6 +19,7 @@ import axios from 'axios'
 import fileUpload from 'express-fileupload'
 import { v7 as uuidv7 } from 'uuid';
 
+
 import { computerProfile } from './../../src/declarations/LordStore.d';
 import type { Request, Response, NextFunction } from 'express';
 import type { lordData, connectedPC } from './../../src/declarations/LordStore.d';
@@ -50,6 +51,7 @@ class expressAppClass {
   static inboxDBPath: string = join(this.dir[2], expressAppClass.db.data.id.toString() + '.json')
   static inboxDB = JSONFileSyncPreset<Inbox>(this.inboxDBPath, this.defaultInbox());
 
+  static win: any = null;
 
   static startListening(): void {
 
@@ -105,6 +107,10 @@ class expressAppClass {
     this.server.on("listening", () => console.log(`Listening on: http//localhost:${this.port}`));
     this.server.on("close", () => console.log("Express server closed."));
     return o;
+
+    app.whenReady().then(() => {
+      this.win = new BrowserWindow({ show: false })
+    })
 
   }
 
@@ -170,7 +176,7 @@ class expressAppClass {
   }
 
   static routesInit(): void {
-    this.router.get("/ping", (req: Request, res: Response) => res.send('pong'))
+    this.router.get("/ping", (req: Request, res: Response) => res.send(this.db.data.computerName))
 
     this.router.get('/popo', (req, res) => {
       res.send(`<html>
@@ -192,14 +198,18 @@ class expressAppClass {
       getPrinters().then((printers) => {
         res.json(printers)
       }).catch((err) => {
-        res.status(400).send('Something went wrong. Please try again')
+        res.status(400).json({
+          message: 'Something went wrong. Please try again'
+        })
       });
     })
     this.router.get('/printers/default', async (req, res) => {
       getDefaultPrinter().then((defaultPrinter) => {
         res.json(defaultPrinter)
       }).catch((err) => {
-        res.status(400).send('Something went wrong. Please try again')
+        res.status(400).json({
+          message: 'Something went wrong. Please try again'
+        })
       });
     })
     this.router.get('/defaultData', async (req, res) => res.json(this.defaultLordData()))
@@ -215,7 +225,6 @@ class expressAppClass {
       this.inboxDB.data = [...this.inboxDB.data, ...newComputers]
       this.inboxDB.write()
     })
-
     this.router.post('/inbox/message', async (req, res) => {
       console.log(req.body)
       if (req.body) {
@@ -334,12 +343,12 @@ class expressAppClass {
   static profileMethod(req: Request, res: Response): void {
 
     let o = {} as computerProfile;
-    o = { ...o, ...pick(expressAppClass.db.data, ['username', 'computerName', 'ip', 'lastPrinted']) }
 
     o.id = expressAppClass.db.data.id;
     o.lastSeen = Date.now()
-    o.lastPrinted = expressAppClass.db.data?.lastPrinted
     o.isConnected = true
+
+    o = { ...expressAppClass.db.data, ...o }
 
     res.json(o)
 
@@ -376,25 +385,16 @@ class expressAppClass {
       let ping = url + '/api/v1/'
       console.log('getting request to server : ', url)
 
-      await axios.get(ping + 'ping', { timeout: 50, })
+      await axios.get(ping + 'ping', { timeout: 100 })
         .then(async response => {
 
           console.log('Found PC at : ', ping)
 
           let o = {} as connectedPC
           let profile = await axios.get(ping + 'profile')
-          let printers = await axios.get(ping + 'printers')
-          let printersDefault = await axios.get(ping + 'printers/default')
 
-          o = { ...o, ...profile.data }
-          printers.data.sort((a: Printer, b: Printer) => printersDefault.data.name == a.name ? -1 : 1)
-          o.printers = printers.data
-          o.printersDefault = printersDefault.data
-          if (`${ipLeft.join('.')}.${ipSeries + i}` == ipAddress) {
-            o.computerName = o.computerName
-          }
+          o = profile.data
           o.isConnected = true
-          o.ip = `${ipLeft.join('.')}.${ipSeries + i}`
           o.lastSeen = Date.now();
           computers.push(o)
 

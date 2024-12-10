@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import os from 'os'
 import fs from 'fs'
 
+
 import expressAppClass from './express-app'
 
 // The built directory structure
@@ -16,6 +17,7 @@ import expressAppClass from './express-app'
 // ├─┬ dist
 // │ └── index.html    > Electron-Renderer
 //
+
 process.env.DIST_ELECTRON = join(__dirname, '..');
 process.env.DIST = join(process.env.DIST_ELECTRON, '../dist');
 process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
@@ -152,3 +154,6 @@ ipcMain.on('ping', () => {
 
 ipcMain.handle('version', () => app.getVersion());
 
+ipcMain.on("searchOnlinePCs", (event) => {
+  event.sender.send("eventFromMain", 'someReply');
+})

@@ -173,6 +173,13 @@ function handlePrint() {
       formData.append("addedBy", lordStore.db.computerName);
     }
     if (selectedComputerData.value?.ip != undefined) {
+
+      axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).catch(e => e = !e)
+
       axios.post(`http://${selectedComputerData.value.ip}:9457/api/v1/upload/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'

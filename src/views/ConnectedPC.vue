@@ -13,7 +13,7 @@ import { ref, onMounted, toDisplayString } from 'vue';
 import { useLordStore } from '../stores/LordStore';
 import ip, { address } from 'ip'
 import axios from 'axios'
-import { last, uniq } from 'lodash'
+import { last, uniq, orderBy } from 'lodash'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './../components/ui/accordion'
 import { Button as uiButton } from '../components/ui/button';
 
@@ -55,7 +55,6 @@ async function loadComputers(force: boolean = false) {
 
 }
 
-onMounted(loadComputers)
 
 
 </script>
@@ -64,7 +63,7 @@ onMounted(loadComputers)
 <template lang="pug">
     .connectedPC-container
 
-      .reload-button-container.mb-8(
+      .hidden.reload-button-container.mb-8(
         :class="{'cursor-not-allowed': connectedPCSearching}"
       )
 
@@ -94,7 +93,7 @@ onMounted(loadComputers)
                 class="dark:border-slate-900  rtl:mr-2 rtl:ml-2"
                 :class="[item.isConnected ? 'bg-green-400' : 'bg-red-600']"
               )
-              span {{ item?.computerName }} {{ item?.ip == lordStore.db.ip ? '(My PC)' : '' }}
+              span {{ item?.computerName }} {{ item?.ip == lordStore.db.ip ? '(You)' : '' }}
           AccordionContent(
             class="px-3 py-4 bg-slate-100 dark:bg-slate-700 dark:text-slate-300"
           )
@@ -103,12 +102,12 @@ onMounted(loadComputers)
             p.text-sm.text-stone-800(v-if="item?.lastPrinted") {{ item?.lastPrinted }}
             hr.my-5.border-slate-800.m-auto(class="w-2/3 dark:border-slate-100")
 
-            ol.list-decimal.printers-list.list-inside(v-if="item?.printers && !connectedPCSearching")
+            ol.list-decimal.printers-list.list-inside(v-if="item?.printers")
               li.pb-1(
-                v-for="printer in item.printers"
+                v-for="printer in orderBy(item.printers, ['name'])"
               )
-                span(:class="{'text-slate-700 font-bold dark:text-slate-200':  printer.name == item.printersDefault.name}")
-                  | {{ printer.name }} {{ printer.name == item.printersDefault.name ? ' : Default' : ''}}
+                span(:class="{'text-slate-700 font-bold dark:text-slate-200':  printer?.name == item?.printersDefault?.name}")
+                  | {{ printer?.name }} #[b {{ printer?.name == item.defaultPrinter?.name ? ' : Default' : ''}}]
                 // span.text-xs.block.mt-1.ml-4.text-stone-800(v-if="printer.paperSizes.length")
                 //   | Supported Size(s) -
                 //   | {{ Array.isArray(printer.paperSizes) ? printer.paperSizes.map((el, i) => '"' + el + '"').join(', ') : printer.paperSizes }}

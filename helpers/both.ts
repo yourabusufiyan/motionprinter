@@ -24,7 +24,8 @@ export function ip_to_sequence(
 ): any {
 
   let ipLeft = dropRight(ip.split('.'))
-  let ipSeries: number = floor(Number(last(ip.split('.'))), -1)
+  let ipSeries: number = floor(Number(last(ip.split('.'))), -2)
+  console.log('ip_to_sequence : ', ipLeft, ' : ', ipSeries, ' to ', arraySize)
 
   return fill(Array(arraySize), 'a').map((el, i) => `${ipLeft.join('.')}.${ipSeries + i}`);
 

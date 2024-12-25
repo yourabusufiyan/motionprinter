@@ -64,10 +64,33 @@ function displayFileName(fileNames: string) {
   return fileNames
 }
 
+function deleteFile(file: $toPrintsCommandsFile) {
 
-onMounted(() => {
-  lordStore.reloadDatabase()
-})
+  if (!lordStore.lowdb.data?.toPrintsCommands?.length) return;
+
+  lordStore.lowdb.data.toPrintsCommands = lordStore.lowdb.data.toPrintsCommands.filter(el => {
+
+    if (el.filename != file.filename) return true;
+
+    lordStore.lowdb.data.trashes.push({
+      ...el, ...{
+        trashedBy: 'auto',
+        isDeleted: false,
+        deletedBy: null,
+        deletedTime: null,
+        trashedTime: Date.now()
+      }
+    })
+
+    lordStore.lowdb.write()
+    lordStore.reloadMain()
+
+    return false;
+
+  })
+
+
+}
 
 </script>
 
@@ -190,6 +213,7 @@ onMounted(() => {
                   td.px-4.py-4.text-sm.whitespace-nowrap
                     button.px-1.py-1.text-gray-500.transition-colors.duration-200.rounded-lg(
                       class="dark:text-gray-300 hover:bg-gray-100"
+                      @click.prevent="deleteFile(tr)"
                     )
                       svg.w-6.h-6(xmlns="http://www.w3.org/2000/svg", fill="none", viewBox="0 0 24 24", stroke-width="1.5", stroke="currentColor")
                         path(stroke-linecap="round", stroke-linejoin="round", d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z")

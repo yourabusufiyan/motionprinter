@@ -16,6 +16,11 @@ export const useLordStore = defineStore('lord', () => {
 
   var apiURL = `http://${ip.address()}:9457/api/v1/data`
   var db = ref<$lordData>({} as $lordData)
+  var lowdb = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData);
+
+  function reloadLowDB() {
+    lowdb = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData);
+  }
 
   console.log('Database path: ' + dbPath, process.env);
 
@@ -24,7 +29,7 @@ export const useLordStore = defineStore('lord', () => {
     db.value = response.data
   }).catch(() => {
     // @ts-ignore
-    db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData);
+    db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData).data;
     console.log('Offline LordStore Updated');
   })
 
@@ -36,15 +41,26 @@ export const useLordStore = defineStore('lord', () => {
       console.log('Online LordStore Updated', db.value);
     }).catch(() => {
       // @ts-ignore
-      db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData);
+      db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData).data;
       console.log('Offline LordStore Updated');
     })
+  }
+
+  async function reloadMain() {
+    try {
+      await axios.get(`http://${ip.address()}:9457/api/v1/ping`)
+    } catch (error) {
+      error = !error;
+    }
   }
 
   return {
     dbPath,
     db,
-    reloadDatabase
+    reloadDatabase,
+    reloadMain,
+    lowdb,
+    reloadLowDB,
   };
 
 });

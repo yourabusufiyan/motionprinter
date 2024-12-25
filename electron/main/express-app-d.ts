@@ -30,3 +30,11 @@ export type toPrintsCommandsFile = uploadFile & {
   addedTime: Date | number,
   printerName?: string | undefined
 }
+
+export type Trash = toPrintsCommandsFile & {
+  trashedBy: string | null,
+  trashedTime: Date | number | null,
+  isDeleted: boolean,
+  deletedBy?: string | null,
+  deletedTime?: Date | number | null,
+}

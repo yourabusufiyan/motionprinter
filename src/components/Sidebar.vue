@@ -10,7 +10,6 @@ import { ipcRenderer } from 'electron';
 
 const routes = ref([
   { path: '/home', display: 'Home' },
-  { path: '/inbox', display: 'Inbox' },
   { path: '/connected-pc', display: 'Connected PC' },
   { path: '/history', display: 'History' },
 ])

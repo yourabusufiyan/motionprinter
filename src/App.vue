@@ -57,9 +57,8 @@ import { uniq, forEach } from 'lodash';
 import { ipcRenderer } from 'electron';
 import { useLordStore } from './stores/LordStore';
 
-import { ip_to_sequence, sleep } from './../helpers/both'
 
-
+const lordDB = useLordStore()
 const router = useRouter()
 const route = useRoute()
 const isAlertOpen = ref(false);
@@ -80,71 +79,13 @@ onMounted(() => {
 })
 
 
-const isFirstLoop = ref(true);
-const addresses = ref<string[]>([])
-const addressesProcessing = ref<string[]>([])
-const onlineAddresses = ref<{ [key: string]: string }>({})
+ipcRenderer.on("notification", (e, data) => {
+  toast(data.msg)
+  console.log('Got notification from Main Process ', data)
+})
 
-const lordDB = useLordStore()
-
-addresses.value = ip_to_sequence({ ip: ip.address(), arraySize: 50 })
-
-setTimeout(async function () {
-  while (true) {
-
-    if (ip.address() == '127.0.0.1') break;
-    addresses.value = uniq(addresses.value)
-
-    addresses.value.map(async (ip: string, i: any) => {
-
-      if (ip in addressesProcessing || ip in Object.keys(onlineAddresses.value)) return;
-
-      addressesProcessing.value.push(ip)
-      axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 3000 })
-        .then((res: any) => {
-          console.log('[App.vue] Ping response from', ip, res.data)
-          if (!onlineAddresses.value[ip]?.length) {
-            onlineAddresses.value[ip] = res.data as string;
-            if (!isFirstLoop.value) {
-              toast.success(`${res.data} is online now.`)
-            }
-          }
-        })
-        .catch((error) => {
-          console.log('');
-        })
-        .finally(() => {
-          addressesProcessing.value = addressesProcessing.value.filter(el => el != ip);
-        })
-
-    })
-
-    await sleep(10_000)
-    isFirstLoop.value = true
-  }
-}, 10_000)
-
-
-setTimeout(async function () {
-  while (true) {
-    for (const [ip, computerName] of Object.entries(onlineAddresses.value)) {
-      axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 3000 })
-        .catch(() => {
-          delete onlineAddresses.value[ip];
-          toast.error(`${computerName} is offline.`)
-        })
-    }
-    await sleep(5_000)
-  }
-}, 5_000)
-
-
-async function testmain() {
-  ipcRenderer.send('searchOnlinePCs')
-}
-
-ipcRenderer.on("eventFromMain", (e, data) => {
-  console.log("data from main process: " + data);
+ipcRenderer.on("reloadDatabase", (e, data) => {
+  lordDB.reloadDatabase()
 })
 
 console.log('[App.vue]', `App.vue End`);

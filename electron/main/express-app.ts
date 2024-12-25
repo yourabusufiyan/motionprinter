@@ -13,22 +13,25 @@ import os from 'node:os'
 import { Low } from 'lowdb'
 import { JSONFileSyncPreset } from 'lowdb/node';
 import { getPrinters, getDefaultPrinter } from 'pdf-to-printer'
-import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy, omit } from "lodash";
+import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy, omit, merge } from "lodash";
 import ip from 'ip'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import fileUpload from 'express-fileupload'
 import { v7 as uuidv7 } from 'uuid';
+import { app, BrowserWindow } from 'electron'
 
-
-import { computerProfile } from './../../src/declarations/LordStore.d';
+import { computerProfile, connectedPC } from './../../src/declarations/LordStore.d';
+import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
 import type { lordData, connectedPC } from './../../src/declarations/LordStore.d';
 import type { uploadFile, toPrintsCommandsFile } from './express-app-d'
 import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
 
-import { app } from 'electron'
 import { Chat, Inbox, Message } from "../../src/declarations/inbox";
+import { ip_to_sequence, sleep } from '../../helpers/both'
+
+import dayjs from 'dayjs'
 
 class expressAppClass {
 
@@ -51,7 +54,12 @@ class expressAppClass {
   static inboxDBPath: string = join(this.dir[2], expressAppClass.db.data.id.toString() + '.json')
   static inboxDB = JSONFileSyncPreset<Inbox>(this.inboxDBPath, this.defaultInbox());
 
-  static win: any = null;
+  static win: BrowserWindow | null = null;
+
+  static isFirstLoop = true
+  static onlineAddresses: { [key: string]: connectedPC } = {}
+  static addresses = ip_to_sequence({ ip: this.ip, arraySize: 300 })
+  static addressesProcessing: string[] = []
 
   static startListening(): void {
 
@@ -59,6 +67,11 @@ class expressAppClass {
       this.isServerRunning = true;
       this.server.listen(this.port);
     }
+
+    this.db.data.recentlyConnectedPCs = this.db.data.ConnectedPCs.map( el => merge(el, { isConnected: false }))
+    this.db.data.ConnectedPCs = []
+    this.db.write();
+    this.win?.webContents.send('reloadDatabase')
 
   }
 
@@ -71,6 +84,7 @@ class expressAppClass {
       defaultPrinter: null,
       printers: [],
       toPrintsCommands: [],
+      trashes: [],
       lastPrinted: 0,
       ConnectedPCs: [],
       recentlyConnectedPCs: [],
@@ -108,10 +122,6 @@ class expressAppClass {
     this.server.on("close", () => console.log("Express server closed."));
     return o;
 
-    app.whenReady().then(() => {
-      this.win = new BrowserWindow({ show: false })
-    })
-
   }
 
   static beforeStartSever(): void {
@@ -120,14 +130,15 @@ class expressAppClass {
     this.dir.map(el => (!existsSync(el)) && mkdirSync(el, { recursive: true }))
     this.db.write()
 
-    // if( this.db.data.ip != ip.address() )
-
     this.routesInit()
     this.middlewareInit()
 
     this.server = http.createServer(this.app);
 
+    this.intervalInit()
+
   }
+
   static handleServerError(error: any) {
     if (error.syscall !== "listen") throw error;
 
@@ -170,6 +181,107 @@ class expressAppClass {
 
   }
 
+  static intervalInit(): void {
+
+    setTimeout(async () => {
+      while (true) {
+
+        if (this.ip == '127.0.0.1') break;
+
+        if (this.isFirstLoop) {
+          this.db.data.ConnectedPCs = []
+          this.db.write();
+          this.win?.webContents.send('reloadDatabase')
+          await sleep(1_000)
+          this.isFirstLoop = false
+        }
+
+        this.addresses.filter(async (ip: string, i: any) => {
+
+          if (ip in this.addressesProcessing || this.onlineAddresses[ip])
+            return false;
+
+          this.addressesProcessing.push(ip)
+
+          let data;
+
+          try {
+            let url = `http://${ip}:9457/api/v1`
+            data = await axios.get(`${url}/ping`, { timeout: 3000 })
+            data = data.data
+            let pc = { ip, computerName: data, isConnected: true };
+            console.log('Online PC from backend ', ip, data)
+            this.onlineAddresses[ip] = pc
+            let msg = ip == this.ip ? 'You are online.' : `"${data}" is online.`
+            this.win?.webContents.send('notification', { msg })
+            this.db.data.ConnectedPCs.push(pc)
+            this.db.data.ConnectedPCs = uniqBy(this.db.data.ConnectedPCs, 'ip')
+            this.db.write();
+            await sleep(100)
+            this.win?.webContents.send('reloadDatabase')
+
+            let profile: AxiosResponse<computerProfile> = await axios.get(`${url}/profile`)
+            this.db.data.ConnectedPCs = this.db.data.ConnectedPCs
+              .map(pc => pc.ip === ip ? { ...pc, ...profile.data } : pc)
+            this.db.write()
+            await sleep(100)
+            this.win?.webContents.send('reloadDatabase')
+
+            let printers: AxiosResponse<Array<localPrinter>> = await axios.get(`${url}/printers/`)
+            this.db.data.ConnectedPCs = this.db.data.ConnectedPCs
+              .map(pc => pc.ip === ip ? { ...pc, ...{ printers: printers.data } } : pc)
+            this.db.write()
+            await sleep(100)
+            this.win?.webContents.send('reloadDatabase')
+
+            let defaultPrinters: AxiosResponse<localPrinter> = await axios.get(`${url}/printers/default`)
+            this.db.data.ConnectedPCs = this.db.data.ConnectedPCs
+              .map(pc => pc.ip === ip ? { ...pc, ...{ defaultPrinter: defaultPrinters.data } } : pc)
+            this.db.write()
+            await sleep(100)
+            this.win?.webContents.send('reloadDatabase')
+
+          } catch (e) {
+            e = !e;
+          } finally {
+            this.addressesProcessing = this.addressesProcessing.filter(el => el != ip);
+          }
+
+        })
+
+        await sleep(10_000)
+
+      }
+    }, 10_000)
+
+    setTimeout(async () => {
+      while (true) {
+
+        // console.log('onlineAddresses', this.onlineAddresses)
+
+        if (!this.onlineAddresses.length) {
+          await sleep(1000)
+          continue;
+        }
+
+        for (const [ip, computerName] of Object.entries(this.onlineAddresses)) {
+          axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 3000 })
+            .catch(async () => {
+              console.error(`${computerName} is offline.`)
+              delete this.onlineAddresses[ip];
+              this.win?.webContents.send('notification', { msg: `<b>${computerName}</b> is offline.` })
+              this.db.data.ConnectedPCs = this.db.data.ConnectedPCs.filter(a => a.ip != ip)
+              this.db.write();
+              await sleep(100)
+              this.win?.webContents.send('reloadDatabase')
+            })
+        }
+        await sleep(5_000)
+      }
+    }, 5_000)
+
+  }
+
   static shutdown(): void {
     console.log("Shutting down Express server...");
     this.server.close();
@@ -180,37 +292,25 @@ class expressAppClass {
 
     this.router.get('/popo', (req, res) => {
       res.send(`<html>
-                <body>
-                  <form ref='uploadForm'
-                    id='uploadForm'
-                    action='/api/v1/upload/'
-                    method='post'
-                    encType="multipart/form-data">
-                      <input type="file" name="sampleFile" />
-                      <input type='submit' value='Upload!' />
-                  </form>
-                </body>
+                  <body>
+                    <form ref='uploadForm'
+                      id='uploadForm'
+                      action='/api/v1/upload/'
+                      method='post'
+                      encType="multipart/form-data">
+                        <input type="file" name="sampleFile" />
+                        <input type='submit' value='Upload!' />
+                    </form>
+                  </body>
               </html>`);
     });
     this.router.post('/upload', this.uploadMethod)
     this.router.post('/print', this.printMethod)
     this.router.get('/printers', async (req, res) => {
-      getPrinters().then((printers) => {
-        res.json(printers)
-      }).catch((err) => {
-        res.status(400).json({
-          message: 'Something went wrong. Please try again'
-        })
-      });
+      res.json(await this?.win?.webContents.getPrintersAsync())
     })
     this.router.get('/printers/default', async (req, res) => {
-      getDefaultPrinter().then((defaultPrinter) => {
-        res.json(defaultPrinter)
-      }).catch((err) => {
-        res.status(400).json({
-          message: 'Something went wrong. Please try again'
-        })
-      });
+      res.json((await this?.win?.webContents.getPrintersAsync())?.filter(el => el.isDefault)[0])
     })
     this.router.get('/defaultData', async (req, res) => res.json(this.defaultLordData()))
     this.router.get('/data', async (req, res) => res.json(this.db.data))
@@ -219,10 +319,10 @@ class expressAppClass {
     this.router.get('/inbox', async (req, res) => {
       let inboxesPC = this.inboxDB.data.map(el => el.id);
       let newComputers = this.db.data.ConnectedPCs
-        .filter(el => !inboxesPC.includes(el.id))
+        // .filter(el => !inboxesPC.includes(el.id))
         .map(el => omit(el, ['printers', 'printersDefault', 'lastPrinted']))
       res.json([...this.inboxDB.data, ...newComputers])
-      this.inboxDB.data = [...this.inboxDB.data, ...newComputers]
+      // this.inboxDB.data = [...this.inboxDB.data, ...newComputers]
       this.inboxDB.write()
     })
     this.router.post('/inbox/message', async (req, res) => {
@@ -350,9 +450,15 @@ class expressAppClass {
 
     o = { ...expressAppClass.db.data, ...o }
 
-    res.json(o)
+    let pickResponse = pick(
+      expressAppClass.db.data,
+      ['id', 'ip', 'username', 'computerName', 'lastSeen', 'lastPrinted', 'isConnected', 'printers', 'printersDefault']
+    )
+
+    res.json(pickResponse)
 
   }
+
   static async connectedPCMethod(req: Request, res: Response) {
 
     let ipAddress: string = ip.address()
@@ -424,6 +530,31 @@ class expressAppClass {
     res.json(expressAppClass.db.data.recentlyConnectedPCs)
 
   }
+
+  static initOnLoad() {
+    this.db.data.toPrintsCommands = this.db.data.toPrintsCommands.filter(file => {
+
+      const fileDate = dayjs(file.addedTime);
+
+      if (fileDate.isBefore(dayjs().subtract(3, 'month'))) {
+
+        this.db.data.trashes.push({
+          ...file, ...{
+            trashedBy: 'auto',
+            isDeleted: false,
+            deletedBy: null,
+            deletedTime: null,
+            trashedTime: Date.now()
+          }
+        })
+
+        return false;
+      }
+
+      return true;
+    })
+  }
+
 
 
 }

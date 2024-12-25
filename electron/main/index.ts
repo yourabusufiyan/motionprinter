@@ -4,19 +4,11 @@ import { join } from 'node:path';
 import os from 'os'
 import fs from 'fs'
 
+import axios from 'axios'
+import { address } from 'ip'
+import { ip_to_sequence, sleep } from '../../helpers/both'
 
 import expressAppClass from './express-app'
-
-// The built directory structure
-//
-// ├─┬ dist-electron
-// │ ├─┬ main
-// │ │ └── index.js    > Electron-Main
-// │ └─┬ preload
-// │   └── index.js    > Preload-Scripts
-// ├─┬ dist
-// │ └── index.html    > Electron-Renderer
-//
 
 process.env.DIST_ELECTRON = join(__dirname, '..');
 process.env.DIST = join(process.env.DIST_ELECTRON, '../dist');
@@ -88,6 +80,8 @@ async function createWindow() {
     win.setMenuBarVisibility(false)
   }
 
+  expressAppClass.win = win;
+
   win.on("closed", () => {
     win = null;
     expressAppClass.shutdown();
@@ -149,7 +143,9 @@ ipcMain.handle('open-win', (_, arg) => {
 });
 
 ipcMain.on('ping', () => {
+})
 
+ipcMain.on('reloadDatabase', () => {
 })
 
 ipcMain.handle('version', () => app.getVersion());
@@ -157,3 +153,4 @@ ipcMain.handle('version', () => app.getVersion());
 ipcMain.on("searchOnlinePCs", (event) => {
   event.sender.send("eventFromMain", 'someReply');
 })
+

@@ -29,7 +29,7 @@ const selectedComputerData = computed(() => find(lordStore.db.ConnectedPCs, ['ip
 
 const printerList = computed(() => selectedComputerData.value?.printers || [])
 const selectedPrinter = ref('')
-const selectedPrinterData = computed(() => find(selectedComputerData.value?.printers, ['deviceId', selectedPrinter.value]))
+const selectedPrinterData = computed(() => find(selectedComputerData.value?.printers, ['name', selectedPrinter.value]))
 
 
 const copies = ref(1)
@@ -50,7 +50,6 @@ const paperSizesData = computed(() => {
       "tabloid": "Tabloid",
       "statement": "Statement",
     },
-    ...selectedPrinterData.value?.paperSizes?.reduce((a, v) => ({ ...a, [v]: v }), {})
   }
   return Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {} as { [property: string]: string })
 })
@@ -158,7 +157,7 @@ function handlePrint() {
 
     isDialogOpen.value = false
 
-    toast.info('Printing' + (selectedComputerData.value?.computerName ? ' to ' + selectedComputerData.value.computerName : '...'), {
+    toast.info('Sending ' + (selectedComputerData.value?.computerName ? ' to ' + selectedComputerData.value.computerName : '...'), {
       description: file.value?.name ? file.value?.name : ''
     })
 
@@ -171,14 +170,17 @@ function handlePrint() {
     formData.append("sampleFile", file.value);
     if (lordStore.db?.computerName) {
       formData.append("addedBy", lordStore.db.computerName);
+      formData.append("addedTo", selectedComputerData.value?.computerName ?? '');
     }
     if (selectedComputerData.value?.ip != undefined) {
 
-      axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }).catch(e => e = !e)
+      if (lordStore.db.ip != selectedComputerData.value.ip) {
+        axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }).catch(e => e = !e)
+      }
 
       axios.post(`http://${selectedComputerData.value.ip}:9457/api/v1/upload/`, formData, {
         headers: {
@@ -256,7 +258,7 @@ onMounted(async () => {
 
   if (lordStore.db.ConnectedPCs?.length == 1) {
     selectedComputer.value = lordStore.db.ConnectedPCs[0]?.ip ? lordStore.db.ConnectedPCs[0]?.ip : ''
-    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.deviceId ? lordStore.db.ConnectedPCs[0]?.printersDefault?.deviceId : ''
+    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.name ? lordStore.db.ConnectedPCs[0]?.printersDefault?.name : ''
   }
 
 })
@@ -291,12 +293,6 @@ Dialog(v-model:open="isDialogOpen")
   DialogContent(
     class="p-0 w-[90dvw] max-w-7xl h-[90dvh] max-h-xl rounded-none sm:rounded-none"
   )
-    DialogHeader.p-6.pb-0.hidden
-      DialogTitle Edit profile
-      DialogDescription
-        | Make changes to your profile here. Click save when you're done.
-      DialogClose(aria-label="Close")
-        span(aria-hidden) x
     .dialog-content-wrapper(
       class="grid gap-4 overflow-y-auto"
     )
@@ -306,7 +302,7 @@ Dialog(v-model:open="isDialogOpen")
             .preview-content.flex.justify-center.my-4.shadow-sm.flex-col.items-center
               pre.hidden {{ pages == 'custom' ? 'df' : true }}
               pre.hidden selectedComputer : {{ selectedComputer }}
-              pre.hidden selectedComputerData.length : {{ selectedComputerData?.computerName }}
+              pre.hidden selectedComputerData : {{ selectedComputerData?.computerName }}
               pre.hidden selectedPrinter : {{ selectedPrinter }}
               pre.hidden printerList  : {{ printerList?.length }}
               div(v-for="page in pdfPages" :key="page")
@@ -344,8 +340,8 @@ Dialog(v-model:open="isDialogOpen")
                       SelectItem(
                         v-if="printerList?.length"
                         v-for="printer in printerList"
-                        :value="printer.deviceId"
-                      ) {{ printer.name }} {{ printer.name == selectedComputer?.printersDefault?.name ? ' : Default' : ''}}
+                        :value="printer.name"
+                      ) {{ printer.name }} {{ printer.name == selectedComputer?.defaultPrinter?.name ? ' : Default' : ''}}
 
               .copies-select-container.block.p-2
                 Label.text-sm.text-black.mb-2.block.font-normal Copies

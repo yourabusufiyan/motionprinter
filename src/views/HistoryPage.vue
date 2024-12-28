@@ -18,10 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from './../components/ui/select'
+import { Badge } from '@/components/ui/badge'
 
 const lordStore = useLordStore();
-const numberOfColumnsToDisplay = ref(10)
-const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.db?.toPrintsCommands, ['addedTime']).toReversed(), numberOfColumnsToDisplay.value))
+const numberOfColumnsToDisplay = ref('10')
+const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.db?.toPrintsCommands, ['addedTime']).toReversed(), +numberOfColumnsToDisplay.value))
 const currentPage = ref(0)
 const paginationNumbers = computed(() => {
 
@@ -39,7 +40,7 @@ const paginationNumbers = computed(() => {
 })
 
 let selectedItems = ref<$toPrintsCommandsFile[]>([])
-const isAllSelected = computed<boolean>(() => selectedItems.value.length == numberOfColumnsToDisplay.value)
+const isAllSelected = computed<boolean>(() => selectedItems.value.length == +numberOfColumnsToDisplay.value)
 
 function selectAllItems() {
   console.log("selectAllItems")
@@ -158,7 +159,7 @@ function deleteFile(file: $toPrintsCommandsFile) {
                     scope="col"
                     class=".py-3.5 rtl:text-right text-gray-500 dark:text-gray-400"
                   )
-                    | Added by
+                    | Added By
 
                   th.relative.px-4(
                     scope="col"
@@ -195,6 +196,16 @@ function deleteFile(file: $toPrintsCommandsFile) {
                           p.text-xs.font-normal.text-gray-500(
                             class="dark:text-gray-400"
                           ) {{ humanFileSize(tr.size) }}
+                            Badge.bg-green-400.uppercase.ml-1(
+                              v-if="tr.isPrinted"
+                              class="py-0 px-1"
+                              style="font-size:10px"
+                            ) Success
+                            Badge.bg-red-500.uppercase.ml-1(
+                              v-if="tr?.isPrinted === false"
+                              class="py-0 px-1"
+                              style="font-size:10px"
+                            ) Failed
 
                   td.px-4.py-4.text-sm.text-gray-500.whitespace-nowrap(
                     class="dark:text-gray-300"
@@ -208,7 +219,7 @@ function deleteFile(file: $toPrintsCommandsFile) {
 
                   td.px-4.py-4.text-sm.text-gray-500.whitespace-nowrap(
                     class="dark:text-gray-300"
-                  ) {{ tr?.addedBy || '' }}
+                  ) {{ tr?.addedBy == lordStore.db.computerName ? `Self to ${tr?.addedTo == lordStore.db.computerName ? 'Self' : tr?.addedTo }` : tr?.addedBy }}
 
                   td.px-4.py-4.text-sm.whitespace-nowrap
                     button.px-1.py-1.text-gray-500.transition-colors.duration-200.rounded-lg(

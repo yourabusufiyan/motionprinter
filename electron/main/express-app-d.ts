@@ -26,6 +26,7 @@ export type uploadFile = {
 export type toPrintsCommandsFile = uploadFile & {
   printOptions?: PrintOptions | null,
   addedBy?: string | null,
+  addedTo?: string | null,
   isPrinted: boolean,
   addedTime: Date | number,
   printerName?: string | undefined

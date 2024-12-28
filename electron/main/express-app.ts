@@ -13,17 +13,16 @@ import os from 'node:os'
 import { Low } from 'lowdb'
 import { JSONFileSyncPreset } from 'lowdb/node';
 import { getPrinters, getDefaultPrinter } from 'pdf-to-printer'
-import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy, omit, merge } from "lodash";
+import { pick, toString, dropRight, floor, last, concat, uniqBy, find, findIndex, sortBy, omit, merge, size } from "lodash";
 import ip from 'ip'
 import axios, { AxiosResponse } from 'axios'
 import fileUpload from 'express-fileupload'
 import { v7 as uuidv7 } from 'uuid';
 import { app, BrowserWindow } from 'electron'
 
-import { computerProfile, connectedPC } from './../../src/declarations/LordStore.d';
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
-import type { lordData, connectedPC } from './../../src/declarations/LordStore.d';
+import type { lordData, connectedPC, computerProfile } from './../../src/declarations/LordStore.d';
 import type { uploadFile, toPrintsCommandsFile } from './express-app-d'
 import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
@@ -68,7 +67,7 @@ class expressAppClass {
       this.server.listen(this.port);
     }
 
-    this.db.data.recentlyConnectedPCs = this.db.data.ConnectedPCs.map( el => merge(el, { isConnected: false }))
+    this.db.data.recentlyConnectedPCs = this.db.data.ConnectedPCs.map(el => merge(el, { isConnected: false }))
     this.db.data.ConnectedPCs = []
     this.db.write();
     this.win?.webContents.send('reloadDatabase')
@@ -183,6 +182,7 @@ class expressAppClass {
 
   static intervalInit(): void {
 
+
     setTimeout(async () => {
       while (true) {
 
@@ -192,9 +192,11 @@ class expressAppClass {
           this.db.data.ConnectedPCs = []
           this.db.write();
           this.win?.webContents.send('reloadDatabase')
-          await sleep(1_000)
+          await sleep(1_00)
           this.isFirstLoop = false
         }
+
+        this.addresses.sort((a: string) => a == this.ip ? -1 : 1)
 
         this.addresses.filter(async (ip: string, i: any) => {
 
@@ -252,33 +254,35 @@ class expressAppClass {
         await sleep(10_000)
 
       }
-    }, 10_000)
+    }, 2_000)
 
     setTimeout(async () => {
       while (true) {
 
         // console.log('onlineAddresses', this.onlineAddresses)
 
-        if (!this.onlineAddresses.length) {
+        if (!size(this.onlineAddresses)) {
           await sleep(1000)
           continue;
         }
 
-        for (const [ip, computerName] of Object.entries(this.onlineAddresses)) {
-          axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 3000 })
+        for (const [ip, data] of Object.entries(this.onlineAddresses)) {
+          axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 1500 })
             .catch(async () => {
-              console.error(`${computerName} is offline.`)
+              console.error(`${data.computerName} is offline.`)
               delete this.onlineAddresses[ip];
-              this.win?.webContents.send('notification', { msg: `<b>${computerName}</b> is offline.` })
+              this.win?.webContents.send('notification', { msg: `${data.computerName} is offline.` })
               this.db.data.ConnectedPCs = this.db.data.ConnectedPCs.filter(a => a.ip != ip)
               this.db.write();
               await sleep(100)
               this.win?.webContents.send('reloadDatabase')
             })
         }
-        await sleep(5_000)
+        
+        await sleep(3_000)
+
       }
-    }, 5_000)
+    }, 10_000)
 
   }
 
@@ -399,6 +403,7 @@ class expressAppClass {
           addedTime: Date.now(),
           isPrinted: false,
           addedBy: req.body?.addedBy || null,
+          addedTo: req.body?.addedTo || null,
           printOptions: req.body?.printOptions || null,
         }
       }

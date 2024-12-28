@@ -1,6 +1,6 @@
 {
   "name": "motionprinter",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Remotely printer sharing application.",
   "author": "Abu Sufiyan<@yourabusufiyan>",
   "license": "MIT",
@@ -90,7 +90,6 @@
     "moment": "^2.30.1",
     "morgan": "^1.10.0",
     "nanoid": "^5.0.8",
-    "npm": "^11.0.0",
     "pdf-to-printer": "^5.6.0",
     "pug": "^3.0.3",
     "radix-vue": "^1.9.5",

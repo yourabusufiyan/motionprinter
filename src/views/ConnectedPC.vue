@@ -9,7 +9,7 @@ import type { connectedPC } from './../declarations/LordStore.d'
 import { ip_to_sequence, checkPing } from '../../helpers/both'
 
 // Vue and its dependencies
-import { ref, onMounted, toDisplayString } from 'vue';
+import { ref, toDisplayString } from 'vue';
 import { useLordStore } from '../stores/LordStore';
 import ip, { address } from 'ip'
 import axios from 'axios'
@@ -19,8 +19,6 @@ import { Button as uiButton } from '../components/ui/button';
 
 
 const lordStore = useLordStore()
-console.log('lordStore', lordStore)
-
 const refreshed = ref(false)
 const numbersToRefresh = ref(10)
 const initialVisit = ref(true)

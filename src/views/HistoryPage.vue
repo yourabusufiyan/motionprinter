@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import moment from 'moment'
-import { chunk, fill, sortBy } from 'lodash'
+import { chunk, fill, sortBy, concat, cloneDeep } from 'lodash'
 import { ref, computed, reactive } from 'vue'
 
 import { useLordStore } from '../stores/LordStore';
@@ -8,6 +8,7 @@ import { humanFileSize } from './../utils/short-functions'
 
 import type { $toPrintsCommandsFile, $lordData } from './../declarations'
 
+import { ipcRenderer } from 'electron';
 
 import {
   Select,
@@ -19,10 +20,30 @@ import {
   SelectValue,
 } from './../components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'vue-sonner'
 
 const lordStore = useLordStore();
 const numberOfColumnsToDisplay = ref('10')
-const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.db?.toPrintsCommands, ['addedTime']).toReversed(), +numberOfColumnsToDisplay.value))
+const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.lowdb.data?.toPrintsCommands, ['addedTime']).toReversed(), +numberOfColumnsToDisplay.value))
 const currentPage = ref(0)
 const paginationNumbers = computed(() => {
 
@@ -41,6 +62,7 @@ const paginationNumbers = computed(() => {
 
 let selectedItems = ref<$toPrintsCommandsFile[]>([])
 const isAllSelected = computed<boolean>(() => selectedItems.value.length == +numberOfColumnsToDisplay.value)
+
 
 function selectAllItems() {
   console.log("selectAllItems")
@@ -65,41 +87,126 @@ function displayFileName(fileNames: string) {
   return fileNames
 }
 
-function deleteFile(file: $toPrintsCommandsFile) {
 
-  if (!lordStore.lowdb.data?.toPrintsCommands?.length) return;
+function deleteFile(file: $toPrintsCommandsFile): boolean {
 
-  lordStore.lowdb.data.toPrintsCommands = lordStore.lowdb.data.toPrintsCommands.filter(el => {
+  let isDeleted = false;
+
+  if (!lordStore.lowdb.data?.toPrintsCommands?.length) return isDeleted;
+
+  console.log("deleteFile", file)
+
+  let beforeCount = lordStore.lowdb.data.toPrintsCommands.length;
+
+  let removeFiled = lordStore.lowdb.data.toPrintsCommands.filter(el => {
 
     if (el.filename != file.filename) return true;
 
-    lordStore.lowdb.data.trashes.push({
-      ...el, ...{
+    isDeleted = true;
+
+    return false;
+
+  })
+  console.log("isDeleted", isDeleted)
+
+  lordStore.lowdb.data.trashes = concat(
+    lordStore.lowdb.data.trashes,
+    {
+      ...file,
+      ...{
         trashedBy: 'auto',
         isDeleted: false,
         deletedBy: null,
         deletedTime: null,
         trashedTime: Date.now()
       }
-    })
+    }
+  )
 
-    lordStore.lowdb.write()
-    lordStore.reloadMain()
+  lordStore.lowdb.data.toPrintsCommands = removeFiled;
 
-    return false;
+  let afterCount = lordStore.lowdb.data.toPrintsCommands.length;
 
-  })
+  console.log("before count", beforeCount, "after count", afterCount)
 
+  if (isDeleted) {
+    lordStore.saveLowDB();
+    lordStore.reloadDatabase();
+  }
+
+  return isDeleted;
 
 }
+
+function onDelete(file: $toPrintsCommandsFile): void {
+
+  let isDeleted = deleteFile(file);
+  if (isDeleted) {
+    toast.success('File moved to trash.', {
+      description: file.originalName,
+    })
+  } else {
+    toast.error('Something went wrong.', {
+      description: file.originalName,
+    })
+  }
+  console.log("onDelete", file)
+}
+
+function onDownload(file: $toPrintsCommandsFile): void {
+  try {
+    ipcRenderer.send('download-file', cloneDeep(file))
+  } catch (error) {
+    error = !error
+  }
+}
+
+function toImage(file: $toPrintsCommandsFile): void {
+  console.log("toImage", file)
+  try {
+    ipcRenderer.send('convert-pdf-to-image', file);
+  } catch (error) {
+    error = !error
+    console.error('Error occurred while converting PDF to images:', error);
+  }
+}
+
+
+ipcRenderer.on('download-success', (event, file) => {
+  toast.success('File downloaded successfully.', {
+    description: file.originalName,
+  })
+});
+
+ipcRenderer.on('download-error', (event, file) => {
+  toast.error('File could not downloaded.', {
+    description: file.originalName,
+  })
+});
+
+ipcRenderer.on('download-cancelled', (event, file) => {
+  toast.info('File cancelled to download.', {
+    description: file.originalName,
+  })
+});
+
+
+ipcRenderer.on('conversion-success', (event, result) => {
+  console.log('Converted images:', result);
+});
+
+ipcRenderer.on('conversion-error', (event, error) => {
+  console.log(`Error: ${error}`);
+});
+
 
 </script>
 
 <template lang="pug">
 .tasks-view
-  .check-files-exits(v-if="lordStore.db?.toPrintsCommands?.length")
+  .check-files-exits(v-if="lordStore.lowdb.data?.toPrintsCommands?.length")
 
-    .table-options(class="dark:text-slate-300", v-if="lordStore.db?.toPrintsCommands?.length >= 11")
+    .table-options(class="dark:text-slate-300", v-if="lordStore.lowdb.data?.toPrintsCommands?.length >= 11")
       p.inline-block.mr-3 Rows per page
       div.inline-block
         Select.bg-white.inline-block(
@@ -110,10 +217,10 @@ function deleteFile(file: $toPrintsCommandsFile) {
             SelectValue(placeholder="10") {{ numberOfColumnsToDisplay }}
           SelectContent
               SelectItem(value="10") 10
-              SelectItem(value="20" v-if="lordStore.db?.toPrintsCommands?.length > 21") 20
-              SelectItem(value="30" v-if="lordStore.db?.toPrintsCommands?.length > 31") 30
-              SelectItem(value="40" v-if="lordStore.db?.toPrintsCommands?.length > 41") 40
-              SelectItem(value="50" v-if="lordStore.db?.toPrintsCommands?.length > 51") 50
+              SelectItem(value="20") 20
+              SelectItem(value="30") 30
+              SelectItem(value="40") 40
+              SelectItem(value="50") 50
 
 
     .flex.flex-col.mt-6
@@ -169,11 +276,11 @@ function deleteFile(file: $toPrintsCommandsFile) {
 
               tbody.bg-white.divide-y.divide-gray-200( class="dark:divide-gray-700 dark:bg-gray-900")
 
-                tr(v-if="lordStore?.db?.toPrintsCommands" v-for="tr, i in pagination[currentPage]")
+                tr(v-if="lordStore?.lowdb.data?.toPrintsCommands" v-for="tr, i in pagination[currentPage]")
 
                   td.px-4.py-4.text-sm.text-gray-500.whitespace-nowrap(
                     class="dark:text-gray-300"
-                  ) {{ i < 9 ? '0' + (i + 1) : i + 1 }}
+                  ) {{ ('0' + (((currentPage * +numberOfColumnsToDisplay) + i) + 1)).slice(-2)  }}
 
                   td.px-4.py-4.text-sm.font-medium.text-gray-700.whitespace-nowrap
                     .inline-flex.items-center.gap-x-3
@@ -192,7 +299,7 @@ function deleteFile(file: $toPrintsCommandsFile) {
                         div
                           h2.font-normal.text-gray-800(
                             class="dark:text-white"
-                          ) {{ displayFileName(tr.originalName) }}
+                          ) {{ displayFileName(tr.originalName) }} 
                           p.text-xs.font-normal.text-gray-500(
                             class="dark:text-gray-400"
                           ) {{ humanFileSize(tr.size) }}
@@ -219,15 +326,33 @@ function deleteFile(file: $toPrintsCommandsFile) {
 
                   td.px-4.py-4.text-sm.text-gray-500.whitespace-nowrap(
                     class="dark:text-gray-300"
-                  ) {{ tr?.addedBy == lordStore.db.computerName ? `Self to ${tr?.addedTo == lordStore.db.computerName ? 'Self' : tr?.addedTo }` : tr?.addedBy }}
+                  ) {{ tr?.addedBy == lordStore.lowdb.data.computerName ? `Self to ${tr?.addedTo == lordStore.lowdb.data.computerName ? 'Self' : tr?.addedTo }` : tr?.addedBy }}
 
                   td.px-4.py-4.text-sm.whitespace-nowrap
-                    button.px-1.py-1.text-gray-500.transition-colors.duration-200.rounded-lg(
-                      class="dark:text-gray-300 hover:bg-gray-100"
-                      @click.prevent="deleteFile(tr)"
-                    )
-                      svg.w-6.h-6(xmlns="http://www.w3.org/2000/svg", fill="none", viewBox="0 0 24 24", stroke-width="1.5", stroke="currentColor")
-                        path(stroke-linecap="round", stroke-linejoin="round", d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z")
+                    DropdownMenu
+                      DropdownMenuTrigger(as-Child)
+                        button.px-1.py-1.text-gray-500.transition-colors.duration-200.rounded-lg(
+                          class="dark:text-gray-300 hover:bg-gray-100"
+                        )
+                          svg.w-6.h-6(xmlns="http://www.w3.org/2000/svg", fill="none", viewBox="0 0 24 24", stroke-width="1.5", stroke="currentColor")
+                            path(stroke-linecap="round", stroke-linejoin="round", d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z")
+                      DropdownMenuContent(align="end" class="w-[160px]")
+                        DropdownMenuLabel Actions
+                        DropdownMenuSeparator
+                        DropdownMenuItem(
+                          class="hover:cursor-pointer" 
+                          @click.prevent="onDownload(tr)"
+                        ) 
+                          | Download
+                        DropdownMenuItem(
+                          class="hover:cursor-pointer" 
+                          @click.prevent="onDelete(tr)"
+                        ) Move to Trash
+                        DropdownMenuItem(
+                          class="hover:cursor-pointer" 
+                          @click.prevent="toImage(tr)"
+                        ) To Image
+
 
     .flex.items-center.justify-between.mt-6
       a.flex.items-center.px-5.py-2.text-sm.text-gray-700.capitalize.transition-colors.duration-200.bg-white.border.rounded-md.gap-x-2.transition-all.cursor-pointer(
@@ -257,10 +382,18 @@ function deleteFile(file: $toPrintsCommandsFile) {
         span Next
         svg.w-5.h-5(class="rtl:-scale-x-100" xmlns="http://www.w3.org/2000/svg", fill="none", viewBox="0 0 24 24", stroke-width="1.5", stroke="currentColor")
           path(stroke-linecap="round", stroke-linejoin="round", d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3")
-  div(v-if="!lordStore.db?.toPrintsCommands?.length")
+  div(v-if="!lordStore.lowdb.data?.toPrintsCommands?.length")
     .no-item-available-container
       h1.font-normal.text-gray-800.text-xl.text-center.my-16(
         class="dark:text-white"
       ) There is no history...
 
+AlertDialog
+  AlertDialogContent
+    AlertDialogHeader
+      AlertDialogTitle Are you absolutely sure?
+      AlertDialogDescription This action cannot be undone. This will permanently delete your account and remove your data from our servers.
+    AlertDialogFooter
+      AlertDialogCancel Cancel
+      AlertDialogAction Continue
 </template>

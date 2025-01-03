@@ -22,6 +22,10 @@ export const useLordStore = defineStore('lord', () => {
     lowdb = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData);
   }
 
+  function saveLowDB() {
+    lowdb.write();
+  }
+
   console.log('Database path: ' + dbPath, process.env);
 
   axios.get(apiURL).then((response) => {
@@ -61,6 +65,7 @@ export const useLordStore = defineStore('lord', () => {
     reloadMain,
     lowdb,
     reloadLowDB,
+    saveLowDB,
   };
 
 });

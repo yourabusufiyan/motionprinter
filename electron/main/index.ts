@@ -1,12 +1,12 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import os from 'os'
 import fs from 'fs'
+import { fromPath } from 'pdf2pic';
 
 import axios from 'axios'
 import { address } from 'ip'
-import { ip_to_sequence, sleep } from '../../helpers/both'
 
 import expressAppClass from './express-app'
 
@@ -58,7 +58,7 @@ async function createWindow() {
   win = new BrowserWindow({
     title: 'Main window',
     icon: join(process.env.PUBLIC, 'favicon.ico'),
-    width: 1080,
+    width: 1220,
     height: 600,
     webPreferences: {
       preload,
@@ -154,3 +154,66 @@ ipcMain.on("searchOnlinePCs", (event) => {
   event.sender.send("eventFromMain", 'someReply');
 })
 
+
+
+// Handle file read and save
+ipcMain.on('download-file', async (event, file) => {
+
+  try {
+    console.log('filePath', file)
+
+    // Open Save Dialog
+    const { canceled, filePath: savePath } = await dialog.showSaveDialog(win as BrowserWindow, {
+      title: 'Save File',
+      defaultPath: join(os.homedir(), 'Downloads', file.originalName),
+    });
+
+    if (canceled || !savePath) {
+      event.reply('download-cancelled', file);
+      return;
+    }
+
+    // Read the local file and write to the chosen location
+    const readStream = fs.createReadStream(file.destination);
+    const writeStream = fs.createWriteStream(savePath);
+
+    readStream.pipe(writeStream);
+
+    writeStream.on('finish', () => {
+      event.reply('download-success', file);
+    });
+
+    writeStream.on('error', (error) => {
+      event.reply('download-error', error.message, file);
+    });
+  } catch (error: any) {
+    event.reply('download-error', error.message, file);
+  }
+
+});
+
+
+ipcMain.on('convert-pdf-to-image', async (event, file) => {
+  const options = {
+    density: 300, // DPI for high quality
+    saveFilename: 'page',
+    savePath: join(os.homedir(), 'Documents'),
+    format: 'png', // PNG or JPEG
+    width: 1024,
+    height: 1448,
+  };
+  console.log('pdfPath', file, options)
+  try {
+
+    const converter = fromPath(file.destination, options);
+    converter(1, { responseType: "image" })
+      .then((resolve) => {
+        console.log("Page 1 is now converted as image");
+        event.reply('conversion-success', resolve);
+        return resolve;
+      });
+
+  } catch (error: any) {
+    event.reply('conversion-error', error);
+  }
+});

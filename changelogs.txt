@@ -5,6 +5,7 @@
   1. Auto searching online computers
   2. Notification for online/offline computer 
   3. Added to self history
+  4. Deleted from self history
 
 1.0.1
 * Removed authors name from footer

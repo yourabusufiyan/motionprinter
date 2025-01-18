@@ -1,9 +1,8 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
-import { release } from 'node:os';
-import { join } from 'node:path';
+import { release } from 'os';
+import { join } from 'path';
 import os from 'os'
 import fs from 'fs'
-import { fromPath } from 'pdf2pic';
 
 import axios from 'axios'
 import { address } from 'ip'
@@ -194,26 +193,6 @@ ipcMain.on('download-file', async (event, file) => {
 
 
 ipcMain.on('convert-pdf-to-image', async (event, file) => {
-  const options = {
-    density: 300, // DPI for high quality
-    saveFilename: 'page',
-    savePath: join(os.homedir(), 'Documents'),
-    format: 'png', // PNG or JPEG
-    width: 1024,
-    height: 1448,
-  };
-  console.log('pdfPath', file, options)
-  try {
 
-    const converter = fromPath(file.destination, options);
-    converter(1, { responseType: "image" })
-      .then((resolve) => {
-        console.log("Page 1 is now converted as image");
-        event.reply('conversion-success', resolve);
-        return resolve;
-      });
-
-  } catch (error: any) {
-    event.reply('conversion-error', error);
-  }
 });
+

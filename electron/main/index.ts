@@ -3,9 +3,9 @@ import { release } from 'os';
 import { join } from 'path';
 import os from 'os'
 import fs from 'fs'
-
 import axios from 'axios'
 import { address } from 'ip'
+import AutoLaunch from 'auto-launch'
 
 import expressAppClass from './express-app'
 
@@ -47,6 +47,24 @@ const dir = [
 
 dir.map(el => (!fs.existsSync(el)) && fs.mkdirSync(el, { recursive: true }))
 
+
+const appAutoLauncher = new AutoLaunch({
+  name: 'MotionPrinter',
+  path: app.getPath('exe'),
+});
+
+// Check if auto-launch is enabled
+appAutoLauncher.isEnabled()
+  .then((isEnabled: boolean) => {
+    if (isEnabled) {
+      console.log('Auto-launch is enabled.');
+    } else {
+      console.log('Auto-launch is not enabled.');
+    }
+  });
+
+// Enable auto-launch
+appAutoLauncher.enable();
 
 async function createWindow() {
 
@@ -196,3 +214,10 @@ ipcMain.on('convert-pdf-to-image', async (event, file) => {
 
 });
 
+ipcMain.on('auto-launch', async (event, AutoLaunch) => {
+  if (AutoLaunch) {
+    appAutoLauncher.enable();
+  } else {
+    appAutoLauncher.disable();
+  }
+});

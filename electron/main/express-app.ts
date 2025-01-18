@@ -267,7 +267,7 @@ class expressAppClass {
         }
 
         for (const [ip, data] of Object.entries(this.onlineAddresses)) {
-          axios.get(`http://${ip}:9457/api/v1/ping`, { timeout: 1500 })
+          axios.get(`http://${ip}:9457/api/v1/ping`)
             .catch(async () => {
               console.error(`${data.computerName} is offline.`)
               delete this.onlineAddresses[ip];
@@ -278,7 +278,7 @@ class expressAppClass {
               this.win?.webContents.send('reloadDatabase')
             })
         }
-        
+
         await sleep(3_000)
 
       }

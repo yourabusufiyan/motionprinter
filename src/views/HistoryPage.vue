@@ -98,7 +98,7 @@ function deleteFile(file: $toPrintsCommandsFile): boolean {
 
   let beforeCount = lordStore.lowdb.data.toPrintsCommands.length;
 
-  let removeFiled = lordStore.lowdb.data.toPrintsCommands.filter(el => {
+  let removeFiled = lordStore.lowdb.data.toPrintsCommands.filter((el: any) => {
 
     if (el.filename != file.filename) return true;
 

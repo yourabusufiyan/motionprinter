@@ -1,11 +1,11 @@
-import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog, Tray, Menu, } from 'electron';
 import { release } from 'os';
 import { join } from 'path';
 import os from 'os'
 import fs from 'fs'
-
 import axios from 'axios'
 import { address } from 'ip'
+import AutoLaunch from 'auto-launch'
 
 import expressAppClass from './express-app'
 
@@ -32,12 +32,12 @@ if (!app.requestSingleInstanceLock()) {
 // process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 let win: BrowserWindow | null = null;
+let tray = null;
 // Here, you can also use other preload
 const preload = join(__dirname, '../preload/index.js');
 const url = process.env.VITE_DEV_SERVER_URL;
 const indexHtml = join(process.env.DIST, 'index.html');
 
-const appName = app.getPath("exe");
 
 const dir = [
   join(os.homedir(), app.getName(), "/public/"),
@@ -46,6 +46,11 @@ const dir = [
 ]
 
 dir.map(el => (!fs.existsSync(el)) && fs.mkdirSync(el, { recursive: true }))
+
+app.setLoginItemSettings({
+  openAtLogin: true,
+  args: ['--hidden']
+});
 
 
 async function createWindow() {
@@ -81,9 +86,49 @@ async function createWindow() {
 
   expressAppClass.win = win;
 
-  win.on("closed", () => {
-    win = null;
-    expressAppClass.shutdown();
+  // Create a tray icon
+  tray = new Tray(join(process.env.PUBLIC, 'favicon.ico')); // Replace with your icon path
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App',
+      click: () => {
+        win?.show();
+      },
+    },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit();
+      },
+    },
+  ]);
+  tray.setToolTip('MotionPrinter');
+  tray.setContextMenu(contextMenu);
+
+  // Handle tray icon click
+  tray.on('click', () => {
+    if (win?.isVisible()) {
+      win?.hide();
+    } else {
+      win?.show();
+      win?.focus();
+    }
+  });
+
+  win.on("close", (event) => {
+    // @ts-ignore
+    if (!app?.isQuitting) {
+      event.preventDefault(); // Prevent the window from closing
+      win?.hide(); // Hide the window instead
+    }
+    // win = null;
+    // expressAppClass.shutdown();
+  });
+
+  // Quit the app when the tray icon is right-clicked and "Quit" is selected
+  app.on('before-quit', () => {
+    // @ts-ignore
+    app.isQuitting = true;
   });
 
 
@@ -103,14 +148,15 @@ async function createWindow() {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  win = null;
-  if (process.platform !== 'darwin') app.quit();
+  // win = null;
+  // if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('second-instance', () => {
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
+    win.show();
     win.focus();
   }
 });
@@ -195,4 +241,3 @@ ipcMain.on('download-file', async (event, file) => {
 ipcMain.on('convert-pdf-to-image', async (event, file) => {
 
 });
-

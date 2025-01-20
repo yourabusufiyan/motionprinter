@@ -1,12 +1,21 @@
 {
   "name": "motionprinter",
-  "version": "1.0.2",
-  "description": "Remotely printer sharing application.",
+  "version": "1.0.3",
+  "description": "MotionPrinter makes your printing easy.",
   "author": "Abu Sufiyan<@yourabusufiyan>",
   "license": "MIT",
   "private": false,
   "expressPort": 9457,
   "main": "dist-electron/main/index.js",
+  "build": {
+    "appId": "com.motionprinter.abusufiyan",
+    "win": {
+      "target": "nsis",
+      "signtoolOptions": {
+        "publisherName": "ABU SUFIYAN"
+      }
+    }
+  },
   "keywords": [
     "printer",
     "print",
@@ -28,6 +37,7 @@
     "update": "taze major -I"
   },
   "devDependencies": {
+    "@types/auto-launch": "^5.0.5",
     "@types/body-parser": "^1.19.5",
     "@types/compare-versions": "^3.3.3",
     "@types/cors": "^2.8.17",

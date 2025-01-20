@@ -20,7 +20,7 @@ AlertDialog(v-model:open="isAlertOpen")
     AlertDialogFooter
       AlertDialogCancel Later
       AlertDialogAction
-        a(href="https://motionprinter.pages.dev/" target="_blank") Download Now
+        a(:href="DownloadLink" target="_blank") Download Now
 
 </template>
 
@@ -52,12 +52,12 @@ import { onMounted, ref } from 'vue'
 import axios from 'axios';
 import ip from 'ip'
 import { compare } from 'compare-versions';
-import { uniq, forEach } from 'lodash';
+import { uniq, forEach, toString } from 'lodash';
 
 import { ipcRenderer } from 'electron';
 import { useLordStore } from './stores/LordStore';
 
-
+const DownloadLink = ref('https://motionprinter.pages.dev/')
 const lordDB = useLordStore()
 const router = useRouter()
 const route = useRoute()
@@ -67,12 +67,13 @@ if (route.path == '/') {
   router.push('/home')
 }
 
-onMounted(() => {
-  axios.get('https://motionprinter.pages.dev/info.json').then(async (response) => {
-    console.log('[App.vue] .... ... .',)
-
-    if (compare(response.data.version || '1.0.0', await ipcRenderer.invoke('version') as string, '>')) {
+onMounted(async () => {
+  axios.get('https://api.github.com/repos/yourabusufiyan/motionprinter/releases/latest').then(async (response) => {
+    const data = response.data
+    console.log('motionprinter from info.json');
+    if (compare(toString(data.tag_name.slice(1)), toString(await ipcRenderer.invoke('version')), '>')) {
       console.log('New version available...')
+      DownloadLink.value = data.assets[0].browser_download_url;
       isAlertOpen.value = true;
     }
   })

@@ -2,7 +2,7 @@
  * @see https://www.electron.build/configuration/configuration
  */
 {
-  appId: 'com.motionprinter.app',
+  appId: 'com.motionprinter.abusufiyan',
   productName: 'MotionPrinter',
   copyright: 'Copyright © 2024 Abu Sufiyan',
   asar: true,
@@ -16,7 +16,6 @@
     target: ['dmg'],
   },
   win: {
-    publisherName: 'Abu Sufiyan from MotionPrinter',
     target: [
       {
         target: 'nsis',

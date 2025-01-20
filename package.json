@@ -7,6 +7,15 @@
   "private": false,
   "expressPort": 9457,
   "main": "dist-electron/main/index.js",
+  "build": {
+    "appId": "com.motionprinter.abusufiyan",
+    "win": {
+      "target": "nsis",
+      "signtoolOptions": {
+        "publisherName": "ABU SUFIYAN"
+      }
+    }
+  },
   "keywords": [
     "printer",
     "print",
@@ -71,7 +80,6 @@
     "@canopassoftware/vue-file-upload": "^1.0.8",
     "@radix-icons/vue": "^1.0.0",
     "@tato30/vue-pdf": "^1.11.3",
-    "auto-launch": "^5.0.6",
     "axios": "^1.7.9",
     "body-parser": "^1.20.2",
     "canvas": "^3.0.1",

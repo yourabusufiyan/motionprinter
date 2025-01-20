@@ -1,7 +1,7 @@
 {
   "name": "motionprinter",
-  "version": "1.0.2",
-  "description": "Remotely printer sharing application.",
+  "version": "1.0.3",
+  "description": "MotionPrinter makes your printing easy.",
   "author": "Abu Sufiyan<@yourabusufiyan>",
   "license": "MIT",
   "private": false,

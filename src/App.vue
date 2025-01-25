@@ -6,9 +6,7 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
     Header
     main.flex-1.flex.justify-between.flex-col.bg-white
       .router-container.container.my-3.flex-1
-        <router-view v-if="ip.address() != '127.0.0.1' "/>
-        .min-h-full.w-full(v-else)
-          p.flex-1 You are not connected to any network
+        <router-view/>
       Footer
 
 AlertDialog(v-model:open="isAlertOpen")

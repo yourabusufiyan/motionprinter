@@ -1,18 +1,21 @@
 import { app, BrowserWindow, shell, ipcMain, dialog, Tray, Menu, } from 'electron';
 import { release } from 'os';
-import { join } from 'path';
+import path from 'path';
 import os from 'os'
 import fs from 'fs'
 import axios from 'axios'
 import { address } from 'ip'
-import AutoLaunch from 'auto-launch'
+// @ts-ignore
+import pdf from 'pdf-poppler'
+
 
 import expressAppClass from './express-app'
+import type { cardMaker } from './express-app-d'
 
-process.env.DIST_ELECTRON = join(__dirname, '..');
-process.env.DIST = join(process.env.DIST_ELECTRON, '../dist');
+process.env.DIST_ELECTRON = path.join(__dirname, '..');
+process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
 process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
-  ? join(process.env.DIST_ELECTRON, '../public')
+  ? path.join(process.env.DIST_ELECTRON, '../public')
   : process.env.DIST;
 
 // Disable GPU Acceleration for Windows 7
@@ -34,15 +37,16 @@ if (!app.requestSingleInstanceLock()) {
 let win: BrowserWindow | null = null;
 let tray = null;
 // Here, you can also use other preload
-const preload = join(__dirname, '../preload/index.js');
+const preload = path.join(__dirname, '../preload/index.js');
 const url = process.env.VITE_DEV_SERVER_URL;
-const indexHtml = join(process.env.DIST, 'index.html');
+const indexHtml = path.join(process.env.DIST, 'index.html');
 
 
 const dir = [
-  join(os.homedir(), app.getName(), "/public/"),
-  join(os.homedir(), app.getName(), "/upload/pdf/"),
-  join(os.homedir(), app.getName(), "/db/"),
+  path.join(os.homedir(), app.getName(), "/public/"),
+  path.join(os.homedir(), app.getName(), "/upload/pdf/"),
+  path.join(os.homedir(), app.getName(), "/upload/image/"),
+  path.join(os.homedir(), app.getName(), "/db/"),
 ]
 
 dir.map(el => (!fs.existsSync(el)) && fs.mkdirSync(el, { recursive: true }))
@@ -61,9 +65,10 @@ async function createWindow() {
 
   win = new BrowserWindow({
     title: 'Main window',
-    icon: join(process.env.PUBLIC, 'favicon.ico'),
+    icon: path.join(process.env.PUBLIC, 'favicon.ico'),
     width: 1220,
     height: 600,
+    
     webPreferences: {
       preload,
       // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
@@ -71,6 +76,7 @@ async function createWindow() {
       // Read more on https://www.electronjs.org/docs/latest/tutorial/context-isolation
       nodeIntegration: true,
       contextIsolation: false,
+      webSecurity: false
     },
   });
 
@@ -87,7 +93,7 @@ async function createWindow() {
   expressAppClass.win = win;
 
   // Create a tray icon
-  tray = new Tray(join(process.env.PUBLIC, 'favicon.ico')); // Replace with your icon path
+  tray = new Tray(path.join(process.env.PUBLIC, 'favicon.ico')); // Replace with your icon path
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show App',
@@ -210,7 +216,7 @@ ipcMain.on('download-file', async (event, file) => {
     // Open Save Dialog
     const { canceled, filePath: savePath } = await dialog.showSaveDialog(win as BrowserWindow, {
       title: 'Save File',
-      defaultPath: join(os.homedir(), 'Downloads', file.originalName),
+      defaultPath: path.join(os.homedir(), 'Downloads', file.originalName),
     });
 
     if (canceled || !savePath) {
@@ -238,6 +244,43 @@ ipcMain.on('download-file', async (event, file) => {
 });
 
 
-ipcMain.on('convert-pdf-to-image', async (event, file) => {
+ipcMain.on('pdf2image', async (event, file) => {
+
+  let opts = {
+    format: 'jpeg',
+    scale: 3_508,
+    out_dir: path.dirname(file.destination),
+    out_prefix: path.basename(file.destination, path.extname(file.destination)),
+    page: null
+  }
+
+  pdf.info(file.destination)
+    .then((pdfinfo: any) => {
+
+      opts.scale = pdfinfo.height_in_pts * (600 / 72)
+
+      pdf.convert(file.destination, opts)
+        .then((res: any) => {
+          file.isConverted = true;
+          file.opts = opts;
+          file.cardBoth = `${opts.out_prefix}-1.jpg`
+          event.reply('pdf2image-success', file);
+          console.log('Successfully converted', opts);
+        })
+        .catch((error: any) => {
+          event.reply('pdf2image-failed', file);
+          console.error(error);
+        })
+
+    });
+
 
 });
+
+import { createA4PDFwithEshremCards } from './../helpers/cardmakers'
+
+ipcMain.on("eshrem", async (event, page: cardMaker) => {
+  let eshremPage = await createA4PDFwithEshremCards(page)
+  console.log('eshremPage', eshremPage)
+  event.reply('eshrem-success', eshremPage);
+})

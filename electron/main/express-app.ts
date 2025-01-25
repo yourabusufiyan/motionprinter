@@ -23,7 +23,7 @@ import { app, BrowserWindow } from 'electron'
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
 import type { lordData, connectedPC, computerProfile } from './../../src/declarations/LordStore.d';
-import type { uploadFile, toPrintsCommandsFile } from './express-app-d'
+import type { uploadFile, toPrintsCommandsFile, cardMaker } from './express-app-d'
 import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
 
@@ -89,6 +89,7 @@ class expressAppClass {
       recentlyConnectedPCs: [],
       lastCheckConnectedPC: 0,
       offlineComputers: [],
+      cardMaker: []
     };
   }
 
@@ -167,8 +168,8 @@ class expressAppClass {
     this.app.use(bodyParser.json());
     this.app.use(bodyParser.urlencoded({ extended: false }));
     this.app.use(fileUpload())
-    this.app.use('/public/', express.static(this.dir[1]));
-    this.app.use('/upload/', express.static(this.dir[0]));
+    this.app.use('/public/', express.static(this.dir[0]));
+    this.app.use('/upload/', express.static(this.dir[1]));
     this.app.use("/api/v1/", this.router);
     this.app.use((_req: any, _res: any, next: any) => next(createError(404)));
     this.app.use((err: any, req: any, res: any, _next: any) => {
@@ -316,8 +317,19 @@ class expressAppClass {
     this.router.get('/printers/default', async (req, res) => {
       res.json((await this?.win?.webContents.getPrintersAsync())?.filter(el => el.isDefault)[0])
     })
-    this.router.get('/defaultData', async (req, res) => res.json(this.defaultLordData()))
-    this.router.get('/data', async (req, res) => res.json(this.db.data))
+    this.router.get('/defaultData', async (req: any, res: any) => res.json(this.defaultLordData()))
+    this.router.get('/data', async (req: any, res: any) => res.json(this.db.data))
+    this.router.post('/savedata', async (req: any, res: any) => {
+      console.log('save data', last(req.body?.data?.cardMaker))
+      if (req.body?.data) {
+        this.db.data = req.body.data;
+        this.db.write()
+        res.json({ status: 'ok' })
+        expressAppClass.win?.webContents.send('reloadDatabase')
+      } else {
+        res.json({ status: 'error' })
+      }
+    })
     this.router.get('/profile', this.profileMethod)
     this.router.get('/connected-pc', this.connectedPCMethod)
     this.router.get('/inbox', async (req, res) => {
@@ -363,8 +375,6 @@ class expressAppClass {
 
     console.log('uploaded file : ', req?.files)
 
-
-
     let sampleFile = {} as UploadedFile;
     let uploadPath;
 
@@ -409,11 +419,36 @@ class expressAppClass {
       }
 
       console.log(o)
-      res.json(o);
 
-      expressAppClass.db.data.toPrintsCommands.push(o)
+      if (req.body?.cardMaker) {
+
+        if (req.body?.makerID) {
+
+          let card = expressAppClass.db.data.cardMaker.find(el => el.id === req.body?.makerID)
+          if (card?.pdfs && card.pdfs.length) {
+            card.pdfs = concat(card.pdfs, { ...o, isConverted: false })
+          }
+          expressAppClass.db.data.cardMaker = expressAppClass.db.data.cardMaker.map(el => el.id === req.body.makerID ? card : el)
+          res.json(card);
+
+        } else {
+          let newCardMaker: cardMaker = {
+            id: uuidv7(),
+            cardType: "eshrem",
+            pdfs: [{ ...o, isConverted: false }],
+          }
+          expressAppClass.db.data.cardMaker.push(newCardMaker)
+          res.json(newCardMaker);
+        }
+
+      } else {
+        expressAppClass.db.data.toPrintsCommands.push(o)
+        res.json(o);
+      }
+
+
       expressAppClass.db.write()
-
+      expressAppClass.win?.webContents.send('reloadDatabase')
       return;
 
     });

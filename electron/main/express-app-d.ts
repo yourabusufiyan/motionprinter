@@ -21,8 +21,6 @@ export type uploadFile = {
   size: number,
 }
 
-
-
 export type toPrintsCommandsFile = uploadFile & {
   printOptions?: PrintOptions | null,
   addedBy?: string | null,
@@ -38,4 +36,26 @@ export type Trash = toPrintsCommandsFile & {
   isDeleted: boolean,
   deletedBy?: string | null,
   deletedTime?: Date | number | null,
+}
+
+export type cardMakerPDF = toPrintsCommandsFile & {
+  isConverted: boolean,
+  opts?: {
+    format: string,
+    scale: number,
+    out_dir: string,
+    out_prefix: string,
+    page: null | number | string
+  },
+  isCropped: boolean,
+  cardBoth?: string | null,
+  cardFront?: string | null,
+  cardBack?: string | null,
+}
+
+export type cardMaker = {
+  id: string,
+  cardType: "eshrem" | "abha" | "aadhaar",
+  outputFile?: string | null,
+  pdfs?: cardMakerPDF[],
 }

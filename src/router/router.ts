@@ -1,6 +1,7 @@
 import { createWebHistory, createRouter, RouteRecordRaw } from 'vue-router';
 
 import { useLordStore } from '@/stores/LordStore';
+import CardMakerRoutes from './cardmaker-routes'; // Import nested routes
 
 console.log('[App.vue]', `router started`);
 
@@ -44,6 +45,10 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'settings',
     component: () => import('../views/SettingsPage.vue'),
+  },
+  {
+    path: '/card-maker',
+    children: CardMakerRoutes
   },
 ];
 

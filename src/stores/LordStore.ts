@@ -58,11 +58,21 @@ export const useLordStore = defineStore('lord', () => {
     }
   }
 
+  async function saveMain() {
+    try {
+      await axios.post(`http://${ip.address()}:9457/api/v1/savedata`, { data: db.value })
+
+    } catch (error) {
+      console.error('Error while saving main data', error);
+    }
+  }
+
   return {
     dbPath,
     db,
     reloadDatabase,
     reloadMain,
+    saveMain,
     lowdb,
     reloadLowDB,
     saveLowDB,

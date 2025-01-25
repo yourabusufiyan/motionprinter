@@ -4,12 +4,13 @@ import { useRoute, useRouter } from 'vue-router';
 import { useLordStore } from '../stores/LordStore';
 import ip from 'ip'
 import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatBubbleIcon } from '@radix-icons/vue'
-import { Network } from 'lucide-vue-next';
+import { Network, IdCard  } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
 
 const routes = ref([
   { path: '/home', display: 'Home' },
+  { path: '/card-maker', display: 'Card Maker' },
   { path: '/connected-pc', display: 'Connected PC' },
   { path: '/history', display: 'History' },
 ])
@@ -55,6 +56,7 @@ aside.top-0.left-0.fixed
           `
         )
           HomeIcon(v-if="r.path == '/home'")
+          IdCard(stroke-width="2" size="16" v-if="r.path == '/card-maker'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           Network(stroke-width="1" size="16" color="black" v-else-if="r.path == '/connected-pc'")
           ChatBubbleIcon(stroke-width="2" size="16" color="black" v-else-if="r.path == '/inbox'")

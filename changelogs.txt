@@ -1,6 +1,9 @@
 1.0.3
 * Added
-  1. Eshrem CardMaker
+  1. CardMaker
+* Removed
+  1. Eshram CardMaker Page
+
 
 1.0.2
 * Removed

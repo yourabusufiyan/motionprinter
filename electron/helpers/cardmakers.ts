@@ -133,26 +133,32 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
 
       // Resize the images to ATM card size
       const basePath = pdf.path
-      const front = await sharp(basePath + pdf.cardFront as string)
+      const front = await sharp(path.join(basePath, pdf.cardFront as string))
         .resize(atmWidthPx, atmHeightPx, { fit: "fill" })
         .toBuffer();
 
-      const back = await sharp(basePath + pdf.cardBack as string)
+      const back = await sharp(path.join(basePath, pdf.cardBack as string))
         .resize(atmWidthPx, atmHeightPx, { fit: "fill" })
         .toBuffer();
 
-      // Place the first image
-      doc.image(front, mmToPt(12.86), mmToPt(top), {
-        width: 250,
-        height: 158,
-      });
+      doc
+        .image(front, mmToPt(12.86), mmToPt(top), {
+          width: 250,
+          height: 158,
+        })
+        .rect(mmToPt(12.86) + 0.055, mmToPt(top) + 0.05, 250 - 0.1, 158 - 0.1)
+        .lineWidth(0.1)
+        .strokeColor("black")
+        .stroke();
 
-      // Place the second image
       doc
         .image(back, mmToPt(108.0338), mmToPt(top), {
           width: 250,
           height: 158,
         })
+        .rect(mmToPt(108.0338) + 0.055, mmToPt(top) + 0.05, 250 - 0.1, 158 - 0.1)
+        .lineWidth(0.1)
+        .strokeColor("black")
         .stroke();
 
       top += 58.5748

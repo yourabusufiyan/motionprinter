@@ -63,6 +63,7 @@ export type cardMakerPDF = toPrintsCommandsFile & {
 
 export type cardMaker = {
   id: string,
+  filename?: string,
   path?: string | null,
   outputFile?: string | null,
   pdfs?: cardMakerPDF[],

@@ -4,7 +4,6 @@
 {
   appId: 'com.motionprinter.abusufiyan',
   productName: 'MotionPrinter',
-  publisherName: 'Abu Sufiyan',
   copyright: 'Copyright © 2024 Abu Sufiyan',
   asar: true,
   icon: 'public/favicon.ico',
@@ -12,23 +11,15 @@
     output: 'release/${version}',
   },
   files: ['dist-electron', 'dist'],
-  mac: {
-    artifactName: 'MotionPrinter_${version}.${ext}',
-    target: ['dmg'],
-  },
   win: {
-    target: [
-      {
-        target: 'nsis',
-        arch: ['x64'],
-      },
-    ],
-    artifactName: 'MotionPrinter_${version}.${ext}',
+    target: 'nsis',
+    icon: 'public/favicon.ico',
+    artifactName: '${productName}-Setup-${version}.${ext}',
   },
   nsis: {
     oneClick: false,
-    perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    perMachine: true,
     deleteAppDataOnUninstall: true,
+    allowToChangeInstallationDirectory: true,
   },
 }

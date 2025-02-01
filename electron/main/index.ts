@@ -10,6 +10,7 @@ import pdf from 'pdf-poppler'
 import { execFile } from 'child_process'
 import { Jimp } from "jimp";
 import { intToRGBA } from "@jimp/utils";
+import { sleep } from '../../helpers/both'
 
 import { isUndefined, last } from 'lodash';
 
@@ -410,34 +411,34 @@ async function extractEshramCard(
 }
 ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
-  console.log('page', page)
   if (!isUndefined(page)) {
     page?.pdfs?.filter(async (card, i) => {
 
       if (card?.isConverted) return true;
 
+      if (card?.cardType == 'eshram') {
+        execFile(
+          path.join(pdf.path, 'pdfimages'),
+          [
+            '-png',
+            card.destination,
+            path.join(card.path, path.basename(card?.filename, path.extname(card?.filename)))
+          ],
+          async (error, stdout, stderr) => {
 
-      execFile(
-        path.join(pdf.path, 'pdfimages'),
-        [
-          '-png',
-          card.destination,
-          path.join(card.path, path.basename(card?.filename, path.extname(card?.filename)))
-        ],
-        async (error, stdout, stderr) => {
-          if (error) {
-            console.error("Error executing script:", error);
-            card.isConverted = false;
-            // @ts-ignore
-            page.pdfs[i] = card;
-            return;
-          }
+            if (error) {
+              console.error("Error executing script:", error);
+              card.isConverted = false;
+              card.errorMessage = 'Something went wrong while converting the pdf.'
+              // @ts-ignore
+              page.pdfs[i] = card;
+              event.reply('cardMaker-failure', { page, card });
+              return;
+            }
 
-          card.isConverted = true;
-          event.reply('cardMaker-success', page);
-          console.log("Output:", stdout, card);
-
-          if (card?.cardType == 'eshram') {
+            card.isConverted = true;
+            event.reply('cardMaker-success', page);
+            console.log("cardMaker-success:", card.originalName);
 
             let cardName = path.basename(card?.filename, path.extname(card?.filename))
             let imagePath = path.join(card.path, `${cardName}-000.png`)
@@ -455,14 +456,15 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
               card.cardBack = `${cardName}-back.png`
               // @ts-ignore
               page.pdfs[i] = card;
-              event.reply('cardMaker-success', page);
               event.reply('cardMaker-image-extracted-success', page);
-              console.log("Eshram card extracted successfully");
+              console.log("cardMaker-image-extracted-success");
+            } else {
+              event.reply('cardMaker-image-extracted-failure', { page, card });
             }
-          }
 
-        }
-      );
+          }
+        );
+      }
 
 
     })
@@ -471,10 +473,12 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 });
 
 ipcMain.on("cardMakerCreatePDF", async (event, page: cardMaker) => {
-  page.outputFile = path.join(page?.path as string, `mp-cardmaker-${last(page.id.split('-'))}.pdf`)
-  let eshremPage = await createA4WithImagesPDF(page)
-  console.log('eshremPage', eshremPage)
-  if (eshremPage) {
+  page.filename = `mp-cardmaker-${last(page.id.split('-'))}.pdf`
+  page.outputFile = path.join(page?.path as string, page.filename)
+  await sleep(500)
+  let cardsPDF = await createA4WithImagesPDF(page)
+  console.log('cardsPDF', cardsPDF)
+  if (cardsPDF) {
     event.reply('cardMakerCreatePDF-success', page);
   } else {
     event.reply('cardMakerCreatePDF-failure', page);

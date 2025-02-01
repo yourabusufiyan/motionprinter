@@ -105,7 +105,7 @@ ipcRenderer.on('pdf2image-failed', (event, file: $cardMakerPDF) => {
 ipcRenderer.on('eshrem-success', (event, file: $cardMaker) => {
   message.value = `E-Shram card generated successfully`
   page.value = file
-  lordStore.db.cardMaker = lordStore.db.cardMaker.map(el => {
+  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
     if (el.id == file?.id) {
       console.log('Updated', el)
       return file

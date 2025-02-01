@@ -23,7 +23,7 @@ import { app, BrowserWindow } from 'electron'
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
 import type { lordData, connectedPC, computerProfile } from './../../src/declarations/LordStore.d';
-import type { uploadFile, toPrintsCommandsFile, cardMaker } from './express-app-d'
+import type { uploadFile, toPrintsCommandsFile, cardMaker, cardMakerPDF } from './express-app-d'
 import type { Printer, PrintOptions } from 'pdf-to-printer'
 import type { UploadedFile } from 'express-fileupload'
 
@@ -31,6 +31,8 @@ import { Chat, Inbox, Message } from "../../src/declarations/inbox";
 import { ip_to_sequence, sleep } from '../../helpers/both'
 
 import dayjs from 'dayjs'
+
+
 
 class expressAppClass {
 
@@ -45,6 +47,7 @@ class expressAppClass {
     join(os.homedir(), app.getName(), "./upload/"),
     join(os.homedir(), app.getName(), "./db/")
   ]
+
   static computerName: string | undefined = process.env.COMPUTERNAME
   static dbName: string = `lordPrinter-${this.ip}.json`
   static dbPath: string = join(this.dir[2], this.dbName)
@@ -128,6 +131,7 @@ class expressAppClass {
 
     // if db file does not exist, create it
     this.dir.map(el => (!existsSync(el)) && mkdirSync(el, { recursive: true }))
+    this.db.data = { ...this.defaultLordData(), ...this.db.data }
     this.db.write()
 
     this.routesInit()
@@ -293,7 +297,7 @@ class expressAppClass {
   }
 
   static routesInit(): void {
-    this.router.get("/ping", (req: Request, res: Response) => res.send(this.db.data.computerName))
+    this.router.get("/ping", (req: Request, res: any) => res.send(this.db.data.computerName))
 
     this.router.get('/popo', (req, res) => {
       res.send(`<html>
@@ -309,7 +313,7 @@ class expressAppClass {
                   </body>
               </html>`);
     });
-    this.router.post('/upload', this.uploadMethod)
+    this.router.post('/upload', this.uploadMethod as any)
     this.router.post('/print', this.printMethod)
     this.router.get('/printers', async (req, res) => {
       res.json(await this?.win?.webContents.getPrintersAsync())
@@ -369,6 +373,29 @@ class expressAppClass {
       res.json({ status: 'success' })
     })
 
+    this.router.post('/cardMaker', function (req: Request, res: Response) {
+      // req.file is the name of your file in the form above, here 'uploaded_file'
+      // req.body will hold the text fields, if there were any 
+      console.log(req.files, req.body)
+
+      if (!req.files || req.files.length) {
+        res.status(400).json({ message: "No files uploaded!" });
+      }
+
+      // Send response with file details
+      res.json({
+        message: "Files uploaded successfully!",
+        // @ts-ignore
+        files: req?.files?.map((file: any) => ({
+          filename: file.filename,
+          path: `/uploads/${file.filename}`,
+        })),
+      });
+
+
+    });
+
+
   }
 
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
@@ -422,20 +449,35 @@ class expressAppClass {
 
       if (req.body?.cardMaker) {
 
+        let cardData: cardMakerPDF = o as cardMakerPDF
+        cardData.cardType = req.body?.cardType
+        cardData.id = req.body?.id
+        cardData.password = req.body?.password
+
         if (req.body?.makerID) {
 
           let card = expressAppClass.db.data.cardMaker.find(el => el.id === req.body?.makerID)
-          if (card?.pdfs && card.pdfs.length) {
-            card.pdfs = concat(card.pdfs, { ...o, isConverted: false })
+
+          if (!card?.id) {
+            res.status(400).send('Card maker not found')
+            return;
           }
+
+          if (card?.pdfs && card.pdfs.length) {
+            let index = req.body?.index || card.pdfs.length
+            card.pdfs[index] = cardData
+          } else {
+            card.pdfs = [cardData]
+          }
+
           expressAppClass.db.data.cardMaker = expressAppClass.db.data.cardMaker.map(el => el.id === req.body.makerID ? card : el)
           res.json(card);
 
         } else {
           let newCardMaker: cardMaker = {
+            path: expressAppClass.dir[1],
             id: uuidv7(),
-            cardType: "eshrem",
-            pdfs: [{ ...o, isConverted: false }],
+            pdfs: [cardData]
           }
           expressAppClass.db.data.cardMaker.push(newCardMaker)
           res.json(newCardMaker);

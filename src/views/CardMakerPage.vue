@@ -34,5 +34,4 @@ router-link(
           )
       CardContent
         CardTitle {{card.title}}
-pre {{cards}}
 </template>

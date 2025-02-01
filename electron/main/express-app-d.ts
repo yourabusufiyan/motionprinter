@@ -12,6 +12,7 @@ export type MutlerFileResponse = {
 
 
 export type uploadFile = {
+  id?: string,
   originalName?: string,
   encoding: string,
   mimetype: string,
@@ -22,6 +23,7 @@ export type uploadFile = {
 }
 
 export type toPrintsCommandsFile = uploadFile & {
+  id?: string,
   printOptions?: PrintOptions | null,
   addedBy?: string | null,
   addedTo?: string | null,
@@ -31,6 +33,7 @@ export type toPrintsCommandsFile = uploadFile & {
 }
 
 export type Trash = toPrintsCommandsFile & {
+  id?: string,
   trashedBy: string | null,
   trashedTime: Date | number | null,
   isDeleted: boolean,
@@ -39,23 +42,28 @@ export type Trash = toPrintsCommandsFile & {
 }
 
 export type cardMakerPDF = toPrintsCommandsFile & {
-  isConverted: boolean,
+  id?: string,
+  isConverted?: boolean,
   opts?: {
-    format: string,
-    scale: number,
-    out_dir: string,
-    out_prefix: string,
-    page: null | number | string
+    format?: string,
+    scale?: number,
+    out_dir?: string,
+    out_prefix?: string,
+    page?: null | number | string
   },
-  isCropped: boolean,
+  isCropped?: boolean,
   cardBoth?: string | null,
   cardFront?: string | null,
   cardBack?: string | null,
+  cardType: "eshram" | "abha" | "aadhaar" | null,
+  password?: string | null,
+  errorMessage?: string | null,
+  warningMessage?: string | null,
 }
 
 export type cardMaker = {
   id: string,
-  cardType: "eshrem" | "abha" | "aadhaar",
+  path?: string | null,
   outputFile?: string | null,
   pdfs?: cardMakerPDF[],
 }

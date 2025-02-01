@@ -6,6 +6,7 @@ import path from "path";
 
 import type { Region } from 'sharp'
 import type { cardMaker, cardMakerPDF } from '../main/express-app-d'
+import { chunk } from "lodash";
 
 
 export async function cropImage(inputPath: string, outputPath: string, cropOptions: Region) {
@@ -92,39 +93,43 @@ export async function createA4PDFwithEshremCards(obj: cardMaker) {
 }
 
 
-async function createA4WithImagesPDF(maker: cardMaker) {
+export async function createA4WithImagesPDF(maker: cardMaker) {
   try {
     // Define dimensions in pixels (Sharp uses pixels, not mm)
     const dpi = 300; // 300 DPI for high quality
     const mmToPx = (mm: number) => Math.round((mm / 25.4) * dpi); // Convert mm to pixels
+    // Convert position and size to points (72 points per inch)
+    const mmToPt = (mm: number) => (mm / 25.4) * 72;
 
     const atmWidthPx = mmToPx(85.6); // ATM card width in pixels
     const atmHeightPx = mmToPx(53.98); // ATM card height in pixels
+    const atmWidthMM = 85.6; // ATM card width in mm
+    const atmHeightMM = 53.98; // ATM card height in mm
 
 
     // Create a new PDF document
     const doc = new PDFDocument({
       size: "A4", // Set page size to A4
       layout: "portrait",
+
     });
 
     // Pipe the PDF to a file
     const writeStream = fs.createWriteStream(maker.outputFile as string);
     doc.pipe(writeStream);
 
-    // Draw the images on the PDF
-    const atmWidthMM = 85.6; // ATM card width in mm
-    const atmHeightMM = 53.98; // ATM card height in mm
 
-    // Convert position and size to points (72 points per inch)
-    const mmToPt = (mm: number) => (mm / 25.4) * 72;
-
-    let count = 1
+    let count = 0
     // let margin = 10
     let top = 3.136
 
     for (let pdf of maker.pdfs as cardMakerPDF[]) {
 
+      if (count === 5) {
+        doc.addPage(); // Add a new page
+        top = 3.136
+        count = 0;
+      }
 
       // Resize the images to ATM card size
       const basePath = pdf.path
@@ -151,6 +156,7 @@ async function createA4WithImagesPDF(maker: cardMaker) {
         .stroke();
 
       top += 58.5748
+      count++
 
     }
 
@@ -161,9 +167,12 @@ async function createA4WithImagesPDF(maker: cardMaker) {
     // Wait for the write stream to finish
     writeStream.on("finish", () => {
       console.log("PDF created successfully:", maker.outputFile);
+      return true;
     });
+    return true;
   } catch (error) {
     console.error("Error creating PDF:", error);
+    return false;
   }
 }
 

@@ -4,6 +4,7 @@
 {
   appId: 'com.motionprinter.abusufiyan',
   productName: 'MotionPrinter',
+  publisherName: 'Abu Sufiyan',
   copyright: 'Copyright © 2024 Abu Sufiyan',
   asar: true,
   icon: 'public/favicon.ico',

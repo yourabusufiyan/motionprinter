@@ -400,7 +400,7 @@ class expressAppClass {
 
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
 
-    console.log('uploaded file : ', req?.files)
+    // console.log('uploaded file : ', req?.files)
 
     let sampleFile = {} as UploadedFile;
     let uploadPath;
@@ -420,9 +420,6 @@ class expressAppClass {
       if (err)
         return res.status(500).send(err);
 
-      console.log('File uploaded!');
-      console.log('req.file', req.file)
-      console.log('req.body', req.body)
 
       const fileData = {} as uploadFile;
 
@@ -445,7 +442,7 @@ class expressAppClass {
         }
       }
 
-      console.log(o)
+      console.log('File uploaded!', o);
 
       if (req.body?.cardMaker) {
 

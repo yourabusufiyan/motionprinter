@@ -1,8 +1,8 @@
 {
   "name": "motionprinter",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "MotionPrinter makes your printing easy.",
-  "author": "Abu Sufiyan<@yourabusufiyan>",
+  "author": "Abu Sufiyan<abusufiyan@engineer.com>",
   "license": "MIT",
   "private": false,
   "expressPort": 9457,
@@ -42,6 +42,7 @@
     "@types/try-catch": "^3.0.2",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/language-plugin-pug": "^2.2.0",
     "@vueuse/core": "^12.3.0",
     "autoprefixer": "^10.4.20",
     "compare-versions": "^6.1.1",

@@ -1,204 +1,212 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onBeforeUnmount } from "vue";
 import axios from "axios";
-import { address } from "ip";
 import { useLordStore } from "@/stores/LordStore";
 import { v7 as uuidv7 } from 'uuid';
 import { ipcRenderer } from 'electron';
-import { clone, cloneDeep, isNull } from 'lodash'
+import type { IpcRendererEvent } from 'electron/renderer';
+import { cloneDeep, isNull } from 'lodash';
 import path from 'path';
 
+// Type imports
 import type { $cardMaker, $cardMakerPDF } from '@/declarations/index'
 
-
+// Components
 import { Input } from '@/components/ui/input'
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Skeleton } from '@/components/ui/skeleton'
 import { RocketIcon } from '@radix-icons/vue'
 
-// Define the structure for each repeater field entry
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | null;
+  cardType: 'eshrem' | 'abha' | null;
   file: File | null;
-  password?: string | null;
-  message?: string | null;
+  password?: string;
+  message?: string;
 }
 
-// Reactive state for repeater fields
-const repeater = ref<RepeaterItem[]>([
-  { id: uuidv7(), cardType: null, file: null }
-]);
-let page = ref<$cardMaker | null>(null)
-const message = ref('')
-const messageFile = ref('')
-const messageWarning = ref('')
-const messageWarningFile = ref('')
-const lordStore = useLordStore()
+const lordStore = useLordStore();
+const repeater = ref<RepeaterItem[]>([createNewRepeaterItem()]);
+const page = ref<$cardMaker | null>(null);
+const message = ref('');
+const messageFile = ref('');
+const messageWarning = ref('');
+const messageWarningFile = ref('');
+const isProcessing = ref(false);
+const isDataToProcess = ref(false);
 
-// Options for select field
 const options = ref([
   { label: "E-Shram", value: "eshram" },
-]);
+  { label: "Abha", value: "abha" },
+].sort((a, b) => a.label.localeCompare(b.label)));
 
+function createNewRepeaterItem(): RepeaterItem {
+  return {
+    id: uuidv7(),
+    cardType: null,
+    file: null
+  };
+}
 
-const addRepeaterField = () => {
-  repeater.value.push({ id: uuidv7(), cardType: null, file: null });
-};
+const addRepeaterField = () => repeater.value.push(createNewRepeaterItem());
+const removeRepeaterField = (index: number) => repeater.value.splice(index, 1);
 
-const removeRepeaterField = (index: number) => {
-  repeater.value.splice(index, 1);
-};
-
-// Function to handle file selection
-const handleFileUpload = (event: Event, index: number) => {
+const handleFileUpload = async (event: Event, index: number) => {
   const target = event.target as HTMLInputElement;
-  const file = ref<File | null>(null);
+  const file = target.files?.[0];
 
-  if (target.files && target.files[0]) {
+  if (!file) return;
 
-    repeater.value[index].file = target.files[0];
-    file.value = target.files[0]
+  messageFile.value = file.name;
+  repeater.value[index].file = file;
+  isProcessing.value = true;
 
-    var formData = new FormData();
-    formData.append("sampleFile", file.value as Blob);
-    formData.append("cardMaker", 'true');
-    formData.append("index", index.toString());
-    formData.append("cardType", repeater.value[index].cardType as string);
-    formData.append("id", repeater.value[index].id as string);
-    formData.append("password", repeater.value[index]?.password || '' as string);
+  const formData = new FormData();
+  formData.append("sampleFile", file);
+  formData.append("cardMaker", 'true');
+  formData.append("index", index.toString());
+  formData.append("cardType", repeater.value[index].cardType || '');
+  formData.append("id", repeater.value[index].id);
+  formData.append("password", repeater.value[index]?.password || '');
 
-    if (page.value?.id) {
-      formData.append("makerID", page.value.id);
-    }
-
-    axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-      .then((res) => {
-        page.value = res.data
-        message.value = "File uploaded successfully!";
-      })
-      .catch(e => {
-        repeater.value[index].file = null;
-        message.value = e.response.data.message || "An error occurred while uploading the file.";
-        console.error(e);
-      })
-
+  if (page.value?.id) {
+    formData.append("makerID", page.value.id);
   }
-};
 
-const submitData = async () => {
-
-
-};
-
-// Function to reset the repeater fields
-const resetFields = () => {
-  repeater.value = [{ id: uuidv7(), cardType: null, file: null, password: '' }];
-  if (!isNull(page.value)) {
-    page.value.pdfs = []
-  }
-};
-
-
-watch(page, () => {
-  if (page?.value?.id && page.value?.pdfs?.length) {
-    ipcRenderer.send('cardMaker', cloneDeep(page.value))
-    console.log('page', page)
-  }
-});
-
-watch(message, () => {
-  setTimeout(() => {
-    message.value = ''
-  }, 10_000)
-})
-
-ipcRenderer.on('cardMaker-failure', (event, { file, card }: { file: $cardMaker, card: $cardMakerPDF }) => {
-  message.value = 'Something went wrong while converting the pdf.'
-  messageFile.value = card.originalName as string
-  page.value = file
-  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
-    if (el.id == file?.id) {
-      console.log('Updated', el)
-      return file
-    }
-    return el
-  })
-  lordStore.saveMain()
-});
-
-ipcRenderer.on('cardMaker-success', (event, file: $cardMaker) => {
-  message.value = `Card has been converted successfully`
-  page.value = file
-  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
-    if (el.id == file?.id) {
-      console.log('Updated', el)
-      return file
-    }
-    return el
-  })
-  lordStore.saveMain()
-});
-
-ipcRenderer.on('cardMaker-image-extracted-failure', (event, { file, card }: { file: $cardMaker, card: $cardMakerPDF }) => {
-  message.value = `Something went wrong while cropping card from pdf`
-  messageFile.value = card.originalName as string
-});
-
-ipcRenderer.on('cardMaker-image-extracted-success', (event, file: $cardMaker) => {
-  message.value = `card image extracted successfully`
-  page.value = file
-  ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value))
-
-  file.pdfs?.filter((el: $cardMakerPDF) => {
-    if (el?.warningMessage) {
-      messageWarning.value = el.warningMessage
-      messageWarningFile.value = el.originalName as string
-    }
-  })
-
-});
-
-ipcRenderer.on('cardMakerCreatePDF-failure', (event, returnPage: $cardMaker) => {
-  message.value = `Something went wrong during PDF file creating.`
-  console.log('cardMakerCreatePDF-failure', returnPage)
-  page.value = returnPage
-});
-
-ipcRenderer.on('cardMakerCreatePDF-success', (event, returnPage: $cardMaker) => {
-  message.value = `PDF file created successfully`
-  console.log('cardMakerCreatePDF-success', returnPage)
-  page.value = returnPage
-  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
-    if (el.id == returnPage?.id) {
-      console.log('Updated', el)
-      return returnPage
-    }
-    return el
-  })
-  lordStore.saveMain()
-});
-
-function onDownload(): void {
-  console.log('onDownload', page.value)
   try {
-    if (page.value?.outputFile) {
-      let file: any = {
-        destination: page.value.outputFile as string,
-        originalName: path.basename(page.value.outputFile as string),
-      }
-      ipcRenderer.send('download-file', cloneDeep(file))
+    const response = await axios.post(
+      `http://${lordStore.db.ip}:9457/api/v1/upload/`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+
+    page.value = response.data;
+    message.value = "File uploaded successfully!";
+  } catch (error) {
+    repeater.value[index].file = null;
+    message.value = axios.isAxiosError(error)
+      ? error.response?.data.message || "Upload failed"
+      : "An error occurred while uploading the file.";
+    console.error("Upload error:", error);
+  } finally {
+    isProcessing.value = false;
+  }
+};
+
+const resetFields = () => {
+  repeater.value = [createNewRepeaterItem()];
+  page.value?.pdfs?.splice(0);
+};
+
+// IPC Event Handlers
+const ipcHandlers = {
+  'cardMaker-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
+    message.value = 'PDF conversion failed';
+    messageFile.value = card.originalName || '';
+    page.value = file;
+    isProcessing.value = false;
+  },
+  'cardMaker-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+    message.value = `Card converted successfully`;
+    isProcessing.value = false;
+  },
+  'cardMaker-image-extracted-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
+    message.value = `Image extraction failed`;
+    messageFile.value = card.originalName || '';
+    isProcessing.value = false;
+  },
+  'cardMaker-image-extracted-success': (event: IpcRendererEvent, file: $cardMaker) => {
+    message.value = `Image extracted successfully`;
+    page.value = file;
+    console.log(file)
+
+    const warning = file.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
+    if (warning) {
+      messageWarning.value = warning.warningMessage || '';
+      messageWarningFile.value = warning.originalName || '';
     }
+    isProcessing.value = false;
+    if (isDataToProcess.value) {
+      ipcRenderer.send('cardMaker', cloneDeep(page.value));
+    }
+  },
+  'cardMakerCreatePDF-failure': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+    message.value = `PDF creation failed`;
+    page.value = returnPage;
+    isProcessing.value = false;
+  },
+  'cardMakerCreatePDF-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+    message.value = `PDF created successfully. You can download the PDF free!`;
+    messageFile.value = returnPage.filename || '';
+    page.value = returnPage;
+    lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) =>
+      el.id === returnPage?.id ? returnPage : el
+    );
+    lordStore.saveMain();
+    isProcessing.value = false;
+  }
+};
+
+// Register IPC listeners
+Object.entries(ipcHandlers).forEach(([event, handler]) => {
+  ipcRenderer.on(event, handler);
+});
+
+// Cleanup listeners
+onBeforeUnmount(() => {
+  Object.keys(ipcHandlers).forEach(event => {
+    ipcRenderer.removeAllListeners(event);
+  });
+});
+
+// Watch page changes
+watch(
+  () => page.value?.pdfs?.length,
+  (newLength, oldLength) => {
+    console.log(!isProcessing.value, newLength, newLength !== oldLength)
+    if (!isProcessing.value && newLength && newLength !== oldLength) {
+      isProcessing.value = true;
+      message.value = 'Card processing...'
+      ipcRenderer.send('cardMaker', cloneDeep(page.value));
+    } else if (isProcessing.value) {
+      isDataToProcess.value = true;
+    }
+  }
+);
+
+const onDownload = () => {
+  if (!page.value?.outputFile) return;
+
+  const file = {
+    destination: page.value.outputFile,
+    originalName: path.basename(page.value.outputFile)
+  };
+
+  try {
+    ipcRenderer.send('download-file', cloneDeep(file));
   } catch (error) {
     console.error("Download failed:", error);
   }
-}
+};
 
+const onSelectChange = (value: string, index: number) => {
+  if (repeater.value[index].cardType && page.value?.pdfs?.length) {
+    page.value.pdfs.splice(index, 1);
+    repeater.value[index].file = null;
+  }
+  repeater.value[index].cardType = value as 'abha' | 'eshrem';
+};
+
+const onCreate = () => {
+  if (page.value?.pdfs?.length) {
+    message.value = "Please wait while creating PDF...";
+    messageFile.value = ''
+    isProcessing.value = true;
+    ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value));
+  }
+};
 </script>
 
 <template lang="pug">
@@ -206,62 +214,110 @@ function onDownload(): void {
   h2.text-xl.font-bold.mb-4 Make card sheet for 100% free!
 
   .space-y-4
-    
-    Alert( v-if="message?.length" variant="info" ) 
-      RocketIcon(class="h-4 w-4")
+    Alert(v-if="message" variant="info")
+      RocketIcon.h-4.w-4
       AlertTitle {{ message }}
-      AlertDescription(v-if="messageFile.length") {{ messageFile }}
-    
-    div( v-if="messageWarning.length" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md")
+      AlertDescription(v-if="messageFile") {{ messageFile }}
+
+    .bg-yellow-100.border-l-4.border-yellow-500.text-yellow-700.p-4.rounded-md(
+      v-if="messageWarning"
+    )
       strong Warning! "{{ messageWarningFile }}"
       p {{ messageWarning }}
 
-    div(v-for="(field, index) in repeater" :key="field.id" class="flex flex-wrap gap-2 items-center border p-3 rounded-lg shadow-sm")
-      
+    div(
+      v-for="(field, index) in repeater"
+      :key="field.id"
+      class="flex flex-wrap gap-2 items-center border p-3 rounded-lg shadow-sm"
+    )
       .select-container.w-40
-        Select(@update:modelValue="(value) => field.cardType = value")
+        Select(@update:modelValue="(value: string) => onSelectChange(value, index)")
           SelectTrigger.p-5
-            SelectValue(placeholder="Select Option")
+            SelectValue(placeholder="Select the Card")
           SelectContent
-            SelectItem(v-for="option in options" :key="option.value" :value="option.value") {{ option.label }}
-      
-      .password-container.w-40(v-if="field.cardType == 'aadhaar'")
+            SelectItem(
+              v-for="option in options"
+              :key="option.value"
+              :value="option.value"
+            ) {{ option.label }}
+
+      .password-container.w-40(v-if="field.cardType === 'aadhaar'")
         Input(
           v-model="field.password"
-          placeholder="Enter PDF's Password"
-          class="border rounded-lg text-sm w-full")
+          placeholder="PDF Password"
+          class="border rounded-lg text-sm w-full"
+        )
 
       .grid.w-full.max-w-sm.items-center(
         class="gap-1.5"
-          :class="{'hover:cursor-not-allowed': !field.cardType}"
+        :class="{ 'hover:cursor-not-allowed': !field.cardType }"
       )
         Input(
           :disabled="!field.cardType"
-          @change="(e) => handleFileUpload(e, index)"
+          @change="(e: Event) => handleFileUpload(e, index)"
           type="file"
           accept=".pdf"
           class="border rounded-lg text-sm m-0 p-0 sm:w-full sm:max-w-full"
         )
 
-      Button(@click="removeRepeaterField(index)" variant="destructive") Remove
+      Button(
+        @click="removeRepeaterField(index)"
+        variant="destructive"
+      ) Remove
 
+  .flex.gap-3.mt-4
+    Button(@click="addRepeaterField" variant="outline") + Add New Card
+    Button(
+      @click="resetFields"
+      variant="secondary"
+      class="border border-gray-300"
+    ) Reset All
 
-  // Action buttons
-  Button(@click="addRepeaterField" variant="outline" class="mt-3") + Add New Card
-  div.flex.gap-3.mt-4
-    Button(@click="submitData" v-if="page?.id" variant="default") Create PDF File
-    Button(@click="resetFields" variant="secondary" class="border border-gray-300") Remove All Cards
-    Button(@click="onDownload()" :disabled="!page?.outputFile" variant="outline" class="bg-green-400 text-white") Download PDF
+    Button(@click="onCreate" variant="default") Create PDF
 
-.display-container.mt-10(
-    v-if="page?.id"
-    class="border p-4 rounded-lg shadow-sm"
-  )
+    Button(
+      @click="onDownload"
+      :disabled="!page?.outputFile"
+      variant="outline"
+      class="bg-green-400 text-white"
+    ) Download PDF
+
+  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.id")
     h2.text-xl.font-bold.mb-4 Generated PDF
-    .card-container.flex.gap-4( v-for="card in page.pdfs" :key="page.id")
-      .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
-        img( :src="`http://${lordStore.db.ip}:9457/upload/${card.cardFront}`" alt="Generated PDF" class=" w-full h-auto")
-      .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
-        img( :src="`http://${lordStore.db.ip}:9457/upload/${card.cardBack}`" alt="Generated PDF" class=" w-full h-auto")
+
+    .card-container
+      .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs" :key="card.id")
+        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
+          img(
+            v-if="card?.cardFront"
+            :src="`http://${lordStore.db.ip}:9457/upload/${card.cardFront}`"
+            alt="Card front"
+            class="w-full h-auto"
+          )
+          .w-full.p-4.shadow-sm(v-else)
+            Skeleton.w-full.rounded-lg.mb-4(class="h-[100px]")
+            .space-y-2.mb-4
+              Skeleton.h-4(class="w-[80%]")
+              Skeleton.h-4(class="w-[60%]")
+            .space-y-2
+              Skeleton.h-3.w-full
+              Skeleton.h-3(class="w-[90%]")
+              Skeleton.h-3(class="w-[85%]")
+        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
+          img(
+            v-if="card?.cardBack"
+            :src="`http://${lordStore.db.ip}:9457/upload/${card.cardBack}`"
+            alt="Card front"
+            class="w-full h-auto"
+          )
+          .w-full.p-4.shadow-sm(v-else)
+            Skeleton.w-full.rounded-lg.mb-4(class="h-[100px]")
+            .space-y-2.mb-4
+              Skeleton.h-4(class="w-[80%]")
+              Skeleton.h-4(class="w-[60%]")
+            .space-y-2
+              Skeleton.h-3.w-full
+              Skeleton.h-3(class="w-[90%]")
+              Skeleton.h-3(class="w-[85%]")
 
 </template>

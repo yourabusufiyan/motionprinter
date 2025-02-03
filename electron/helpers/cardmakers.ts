@@ -9,29 +9,32 @@ import type { cardMaker, cardMakerPDF } from '../main/express-app-d'
 import { chunk } from "lodash";
 
 
-export async function cropImage(inputPath: string, outputPath: string, cropOptions: Region) {
-  try {
-    const roundedCornersSVG = Buffer.from(
-      `<svg width="${cropOptions.width}" height="${cropOptions.height}" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="0" width="${cropOptions.width}" height="${cropOptions.height}" rx="11.338582677" ry="11.338582677" fill="white" />
-      </svg>`
-    );
+export async function cropImage(inputPath: string, outputPath: string, cropOptions: Region): Promise<string> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const roundedCornersSVG = Buffer.from(
+        `<svg width="${cropOptions.width}" height="${cropOptions.height}" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="${cropOptions.width}" height="${cropOptions.height}" rx="11.338582677" ry="11.338582677" fill="white" />
+        </svg>`
+      );
 
-    await sharp(inputPath)
-      .extract({
-        left: cropOptions.left, // X-coordinate of the top-left corner
-        top: cropOptions.top, // Y-coordinate of the top-left corner
-        width: cropOptions.width, // Width of the cropped area
-        height: cropOptions.height, // Height of the cropped area
-      })
-      .keepMetadata()
-      .composite([{ input: roundedCornersSVG, blend: "dest-in" }])
-      .toFile(outputPath);
-
-    console.log("Image cropped successfully!", inputPath, outputPath);
-  } catch (error) {
-    console.error("Error cropping image:", error);
-  }
+      await sharp(inputPath)
+        .extract({
+          left: cropOptions.left, // X-coordinate of the top-left corner
+          top: cropOptions.top, // Y-coordinate of the top-left corner
+          width: cropOptions.width, // Width of the cropped area
+          height: cropOptions.height, // Height of the cropped area
+        })
+        .keepMetadata()
+        .composite([{ input: roundedCornersSVG, blend: "dest-in" }])
+        .toFile(outputPath);
+      console.log("Image cropped successfully!", inputPath, outputPath);
+      resolve(outputPath)
+    } catch (error) {
+      reject(outputPath)
+      console.error("Error cropping image:", error);
+    }
+  });
 }
 
 export async function extractEshrem(pdf: cardMakerPDF): Promise<cardMakerPDF> {
@@ -51,7 +54,7 @@ export async function extractEshrem(pdf: cardMakerPDF): Promise<cardMakerPDF> {
     width: 1903,
     height: 1215,
   };
-  cropImage(inputPath, frontOutputPath, frontCropOptions);
+  await cropImage(inputPath, frontOutputPath, frontCropOptions);
 
   const backOutputPath = `${pdf.path}${fileNameWithoutExt}-back.jpg`; // Path to save the cropped image
   const backCropOptions = {

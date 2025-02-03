@@ -16,6 +16,7 @@ import { isUndefined, last } from 'lodash';
 
 import expressAppClass from './express-app'
 import type { cardMaker, cardMakerPDF } from './express-app-d'
+import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage } from './../helpers/cardmakers'
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
@@ -248,6 +249,42 @@ ipcMain.on('download-file', async (event, file) => {
 
 });
 
+async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
+  return new Promise((resolve, reject) => {
+    let opts = {
+      format: 'png',
+      scale: 3_508,
+      out_dir: path.dirname(file.destination),
+      out_prefix: path.basename(file.destination, path.extname(file.destination)),
+      page: null
+    }
+
+    pdf.info(file.destination)
+      .then((pdfinfo: any) => {
+
+        opts.scale = pdfinfo.height_in_pts * (600 / 72)
+
+        pdf.convert(file.destination, opts)
+          .then((res: any) => {
+            file.isConverted = true;
+            file.opts = opts;
+            file.cardBoth = `${opts.out_prefix}-1.png`
+            console.log('Successfully converted', opts);
+            resolve(file);
+          })
+          .catch((error: any) => {
+            console.error(error);
+            reject(error);
+          })
+
+
+      })
+      .catch((error: any) => {
+        console.error(error);
+        reject(error);
+      })
+  })
+}
 
 ipcMain.on('pdf2image', async (event, file) => {
 
@@ -281,8 +318,6 @@ ipcMain.on('pdf2image', async (event, file) => {
 
 
 });
-
-import { createA4PDFwithEshremCards, createA4WithImagesPDF } from './../helpers/cardmakers'
 
 ipcMain.on("eshrem", async (event, page: cardMaker) => {
   let eshremPage = await createA4PDFwithEshremCards(page)
@@ -464,6 +499,56 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
           }
         );
+      } else if (card?.cardType == 'abha') {
+        console.log("this is converted card", card);
+        pdf2image(card)
+          .then(async (newCard: cardMakerPDF) => {
+            // @ts-ignore
+            page.pdfs[i] = card = newCard;
+            event.reply('cardMaker-success', page);
+            console.log("pdf2image cardMaker-success:", card.originalName);
+
+            let cardName = path.basename(card?.filename, path.extname(card?.filename))
+            let imagePath = path.join(card.path, card.cardBoth as string);
+
+            card.cardFront = `${cardName}-front.png`
+            const frontOutputPath = path.join(card.path, card.cardFront);
+            const frontCropOptions = {
+              left: 89,
+              top: 89,
+              width: 3696,
+              height: 2263,
+            };
+
+            card.cardBack = `${cardName}-back.png`
+            const backOutputPath = path.join(card.path, card.cardBack);
+            const backCropOptions = {
+              left: 89,
+              top: 2448,
+              width: 3696,
+              height: 2263,
+            };
+
+            try {
+              await cropImage(imagePath, frontOutputPath, frontCropOptions);
+              await cropImage(imagePath, backOutputPath, backCropOptions)
+              // @ts-ignore
+              page.pdfs[i] = card;
+              event.reply('cardMaker-image-extracted-success', page);
+              console.log("cardMaker-image-extracted-success");
+            } catch (error) {
+              event.reply('cardMaker-image-extracted-failure', { page, card });
+            }
+
+
+          })
+          .catch((error) => {
+            card.isConverted = false;
+            card.errorMessage = 'Something went wrong while converting the pdf.'
+            // @ts-ignore
+            page.pdfs[i] = card;
+            event.reply('cardMaker-failure', { page, card });
+          });
       }
 
 

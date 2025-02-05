@@ -68,7 +68,7 @@ if (route.path == '/') {
 onMounted(async () => {
   axios.get('https://api.github.com/repos/yourabusufiyan/motionprinter/releases/latest').then(async (response) => {
     const data = response.data
-    console.log('motionprinter from info.json');
+    console.log('Latest Release: ', data)
     if (compare(toString(data.tag_name.slice(1)), toString(await ipcRenderer.invoke('version')), '>')) {
       console.log('New version available...')
       DownloadLink.value = data.assets[0].browser_download_url;

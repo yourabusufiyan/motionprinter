@@ -3,6 +3,8 @@ import sharp from "sharp";
 import PDFDocument from "pdfkit";
 import fs from "fs";
 import path from "path";
+import { Jimp } from "jimp";
+import { intToRGBA } from "@jimp/utils";
 
 import type { Region } from 'sharp'
 import type { cardMaker, cardMakerPDF } from '../main/express-app-d'
@@ -95,6 +97,121 @@ export async function createA4PDFwithEshremCards(obj: cardMaker) {
 
 }
 
+export async function extractEshramCard(
+  imagePath: string,
+  outputDir: string,
+  prefix = "image",
+  BORDER_COLOR = { r: 204, g: 204, b: 204 }
+) {
+  const COLOR_TOLERANCE = 5; // Allow slight color variations (±5 in RGB values)
+  // Require 80% of pixels in a row/column to be border-colored
+  const MIN_BORDER_LENGTH = 0.5;
+
+  try {
+    const image = await Jimp.read(imagePath);
+    const { width, height } = image.bitmap;
+
+    if (width < 500) {
+
+      console.log('having low image auto cropping the image')
+      image.autocrop();
+      image
+        .clone()
+        .crop({ x: 0, y: 0, w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
+        .write(`${outputDir}/${prefix}-front.png`);
+      image
+        .clone()
+        .crop({ x: 0, y: Math.floor(image.bitmap.height / 2), w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
+        .write(`${outputDir}/${prefix}-back.png`);
+
+      return true;
+    } else {
+      // Check if a pixel matches the border color (with tolerance)
+      const isBorderColor = (r: number, g: number, b: number) => {
+        return (
+          Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+          Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+          Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE
+        );
+      };
+
+      // Find horizontal borders (rows)
+      const horizontalBorders = [];
+      for (let y = 0; y < height; y++) {
+        let borderPixels = 0;
+        for (let x = 0; x < width; x++) {
+          const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
+          if (isBorderColor(r, g, b)) borderPixels++;
+        }
+        // Check if this row qualifies as a border
+        if (borderPixels / width >= MIN_BORDER_LENGTH) {
+          horizontalBorders.push(y);
+        }
+      }
+
+      // Debug: Log detected horizontal borders
+      console.log("Horizontal borders:", horizontalBorders);
+
+      // Find vertical borders for each region between horizontal borders
+      const regions = [];
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        // Find vertical borders in this region
+        const verticalBorders = [];
+        for (let x = 0; x < width; x++) {
+          let borderPixels = 0;
+          for (let y = yStart; y <= yEnd; y++) {
+            const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
+            if (isBorderColor(r, g, b)) borderPixels++;
+          }
+          // Check if this column qualifies as a border
+          if (borderPixels / (yEnd - yStart + 1) >= MIN_BORDER_LENGTH) {
+            verticalBorders.push(x);
+          }
+        }
+
+        // Debug: Log detected vertical borders for this region
+        console.log(
+          `Vertical borders between rows ${yStart}-${yEnd}:`,
+          verticalBorders
+        );
+
+        // Find regions between vertical borders
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const x = verticalBorders[j] + 1;
+          const y = yStart;
+          const w = verticalBorders[j + 1] - x;
+          const h = yEnd - yStart + 1;
+          // Ensure region has valid dimensions
+          if (w > 0 && h > 0) {
+            regions.push({ x, y, w, h });
+          }
+        }
+      }
+
+      // Save regions as images
+      if (regions.length === 0) {
+        console.log("No regions found. Check border detection above.");
+        return false;
+      }
+
+      fs.mkdirSync(outputDir, { recursive: true });
+      regions.forEach((region, index) => {
+        image
+          .clone()
+          .crop(region)
+          .write(`${outputDir}/${prefix}-${index == 0 ? 'front' : 'back'}.png`);
+      });
+      console.log(`Extracted ${regions.length} images!`);
+      return true;
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    return false;
+  }
+}
 
 export async function createA4WithImagesPDF(maker: cardMaker) {
   try {

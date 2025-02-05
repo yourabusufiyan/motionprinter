@@ -5,7 +5,7 @@ import { useLordStore } from "@/stores/LordStore";
 import { v7 as uuidv7 } from 'uuid';
 import { ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron/renderer';
-import { cloneDeep, isNull } from 'lodash';
+import { cloneDeep, isEqual, isNull, isObject, toString, merge } from 'lodash';
 import path from 'path';
 
 // Type imports
@@ -18,10 +18,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton'
 import { RocketIcon } from '@radix-icons/vue'
+import { Loader2 } from 'lucide-vue-next'
 
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | 'abha' | null;
+  cardType: 'eshrem' | 'abha' | 'aadhaar' | null;
   file: File | null;
   password?: string;
   message?: string;
@@ -40,6 +41,7 @@ const isDataToProcess = ref(false);
 const options = ref([
   { label: "E-Shram", value: "eshram" },
   { label: "Abha", value: "abha" },
+  { label: "Aadhaar", value: "aadhaar" },
 ].sort((a, b) => a.label.localeCompare(b.label)));
 
 function createNewRepeaterItem(): RepeaterItem {
@@ -50,14 +52,54 @@ function createNewRepeaterItem(): RepeaterItem {
   };
 }
 
+function saveToMain() {
+  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
+    if (el.id === page.value?.id) {
+      if (page.value?.pdfs) {
+        page.value.pdfs = page.value?.pdfs?.filter((pdf: $cardMakerPDF) => isObject(pdf));
+      }
+      return page.value
+    }
+    return el;
+  });
+  lordStore.saveMain();
+}
+
 const addRepeaterField = () => repeater.value.push(createNewRepeaterItem());
-const removeRepeaterField = (index: number) => repeater.value.splice(index, 1);
+const removeRepeaterField = (index: number) => {
+  if (page.value?.pdfs) {
+    page.value.pdfs = page.value?.pdfs?.filter((el: $cardMakerPDF) => el?.id != repeater.value[index]?.id);
+  }
+  repeater.value.splice(index, 1)
+};
+const handlePasswordChange = async (event: Event, index: number, card: $cardMakerPDF) => {
+  console.log('password chnge', page.value?.pdfs?.length, page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id), card)
+  if (page.value?.pdfs?.length && page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)) {
+    page.value.pdfs[index].password = toString(repeater.value[index].password);
+    console.log('password sentttttt', page.value)
+    message.value = 'Card processing. Please wait...'
+    ipcRenderer.send('cardMaker', cloneDeep(page.value));
+  }
+}
 
 const handleFileUpload = async (event: Event, index: number) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
+  let card = repeater.value[index]
+  const password = card?.password;
 
   if (!file) return;
+
+  if (card?.cardType == 'aadhaar' && !password) {
+    message.value = 'Please enter the password for the Aadhaar card';
+    // return;
+  }
+
+  if (isProcessing.value) {
+    messageWarning.value = 'Please wait while processing the card...';
+    isDataToProcess.value = true;
+    return;
+  }
 
   messageFile.value = file.name;
   repeater.value[index].file = file;
@@ -81,16 +123,19 @@ const handleFileUpload = async (event: Event, index: number) => {
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
-
-    page.value = response.data;
     message.value = "File uploaded successfully!";
+
+    if (response?.data?.pdfs?.length && !isEqual(page.value, response.data)) {
+      message.value = 'Card processing. Please wait...'
+      ipcRenderer.send('cardMaker', cloneDeep(response.data));
+    }
+    page.value = response.data;
   } catch (error) {
     repeater.value[index].file = null;
     message.value = axios.isAxiosError(error)
       ? error.response?.data.message || "Upload failed"
       : "An error occurred while uploading the file.";
     console.error("Upload error:", error);
-  } finally {
     isProcessing.value = false;
   }
 };
@@ -102,24 +147,30 @@ const resetFields = () => {
 
 // IPC Event Handlers
 const ipcHandlers = {
-  'cardMaker-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
-    message.value = 'PDF conversion failed';
-    messageFile.value = card.originalName || '';
-    page.value = file;
+  'cardMaker-failure': (event: IpcRendererEvent, response: { page: $cardMaker; card: $cardMakerPDF }) => {
+    message.value = response.card.errorMessage || 'PDF conversion failed';
+    messageFile.value = response.card.originalName || '';
+    page.value = merge(page.value, response.page);
     isProcessing.value = false;
+    if (isDataToProcess.value) {
+      ipcRenderer.send('cardMaker', cloneDeep(page.value));
+    }
   },
   'cardMaker-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `Card converted successfully`;
-    isProcessing.value = false;
+    page.value = merge(page.value, returnPage);
   },
   'cardMaker-image-extracted-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
     message.value = `Image extraction failed`;
     messageFile.value = card.originalName || '';
     isProcessing.value = false;
+    if (isDataToProcess.value) {
+      ipcRenderer.send('cardMaker', cloneDeep(page.value));
+    }
   },
   'cardMaker-image-extracted-success': (event: IpcRendererEvent, file: $cardMaker) => {
     message.value = `Image extracted successfully`;
-    page.value = file;
+    page.value = merge(page.value, file);;
     console.log(file)
 
     const warning = file.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
@@ -134,17 +185,14 @@ const ipcHandlers = {
   },
   'cardMakerCreatePDF-failure': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `PDF creation failed`;
-    page.value = returnPage;
+    page.value = merge(page.value, returnPage);
     isProcessing.value = false;
   },
   'cardMakerCreatePDF-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `PDF created successfully. You can download the PDF free!`;
     messageFile.value = returnPage.filename || '';
-    page.value = returnPage;
-    lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) =>
-      el.id === returnPage?.id ? returnPage : el
-    );
-    lordStore.saveMain();
+    page.value = merge(page.value, returnPage);
+    saveToMain()
     isProcessing.value = false;
   }
 };
@@ -160,21 +208,6 @@ onBeforeUnmount(() => {
     ipcRenderer.removeAllListeners(event);
   });
 });
-
-// Watch page changes
-watch(
-  () => page.value?.pdfs?.length,
-  (newLength, oldLength) => {
-    console.log(!isProcessing.value, newLength, newLength !== oldLength)
-    if (!isProcessing.value && newLength && newLength !== oldLength) {
-      isProcessing.value = true;
-      message.value = 'Card processing...'
-      ipcRenderer.send('cardMaker', cloneDeep(page.value));
-    } else if (isProcessing.value) {
-      isDataToProcess.value = true;
-    }
-  }
-);
 
 const onDownload = () => {
   if (!page.value?.outputFile) return;
@@ -192,9 +225,10 @@ const onDownload = () => {
 };
 
 const onSelectChange = (value: string, index: number) => {
-  if (repeater.value[index].cardType && page.value?.pdfs?.length) {
-    page.value.pdfs.splice(index, 1);
+  if (page.value?.pdfs?.length) {
+    page.value.pdfs = page.value?.pdfs?.filter((el: $cardMakerPDF) => el?.id != repeater.value[index]?.id);
     repeater.value[index].file = null;
+    saveToMain()
   }
   repeater.value[index].cardType = value as 'abha' | 'eshrem';
 };
@@ -212,10 +246,10 @@ const onCreate = () => {
 <template lang="pug">
 .container.mx-auto.p-4
   h2.text-xl.font-bold.mb-4 Make card sheet for 100% free!
-
   .space-y-4
     Alert(v-if="message" variant="info")
-      RocketIcon.h-4.w-4
+      Loader2.w-4.h-4.animate-spin(v-if="isProcessing")
+      RocketIcon.h-4.w-4(v-else)
       AlertTitle {{ message }}
       AlertDescription(v-if="messageFile") {{ messageFile }}
 
@@ -244,6 +278,7 @@ const onCreate = () => {
       .password-container.w-40(v-if="field.cardType === 'aadhaar'")
         Input(
           v-model="field.password"
+          @change="(e: Event) => handlePasswordChange(e, index, field)"
           placeholder="PDF Password"
           class="border rounded-lg text-sm w-full"
         )
@@ -254,6 +289,7 @@ const onCreate = () => {
       )
         Input(
           :disabled="!field.cardType"
+          :key="field.cardType"
           @change="(e: Event) => handleFileUpload(e, index)"
           type="file"
           accept=".pdf"
@@ -286,7 +322,7 @@ const onCreate = () => {
     h2.text-xl.font-bold.mb-4 Generated PDF
 
     .card-container
-      .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs" :key="card.id")
+      .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs?.filter(isObject)" :key="card.id")
         .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
           img(
             v-if="card?.cardFront"

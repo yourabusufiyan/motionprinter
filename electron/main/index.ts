@@ -16,7 +16,7 @@ import { isUndefined, last } from 'lodash';
 
 import expressAppClass from './express-app'
 import type { cardMaker, cardMakerPDF } from './express-app-d'
-import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage } from './../helpers/cardmakers'
+import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard } from './../helpers/cardmakers'
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
@@ -249,20 +249,31 @@ ipcMain.on('download-file', async (event, file) => {
 
 });
 
-async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
+async function pdf2image(file: cardMakerPDF & { highResolution?: boolean }): Promise<cardMakerPDF> {
   return new Promise((resolve, reject) => {
     let opts = {
       format: 'png',
       scale: 3_508,
       out_dir: path.dirname(file.destination),
       out_prefix: path.basename(file.destination, path.extname(file.destination)),
-      page: null
+      page: null,
+      args: {}
+    };
+
+    if (file?.password) {
+      opts.args = {
+        'opw': file.password
+      }
     }
 
-    pdf.info(file.destination)
+    pdf.info(file.destination, opts)
       .then((pdfinfo: any) => {
 
         opts.scale = pdfinfo.height_in_pts * (600 / 72)
+
+        if (file?.highResolution) {
+          opts.scale *= 2
+        }
 
         pdf.convert(file.destination, opts)
           .then((res: any) => {
@@ -274,6 +285,8 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
           })
           .catch((error: any) => {
             console.error(error);
+            const errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || "Unknown error";
+            console.log(errorMessage);
             reject(error);
           })
 
@@ -326,124 +339,6 @@ ipcMain.on("eshrem", async (event, page: cardMaker) => {
 })
 
 
-
-async function extractEshramCard(
-  imagePath: string,
-  outputDir: string,
-  prefix = "image",
-  BORDER_COLOR = { r: 204, g: 204, b: 204 }
-) {
-  const COLOR_TOLERANCE = 5; // Allow slight color variations (±5 in RGB values)
-  // Require 80% of pixels in a row/column to be border-colored
-  const MIN_BORDER_LENGTH = 0.5;
-
-  try {
-    const image = await Jimp.read(imagePath);
-    const { width, height } = image.bitmap;
-
-    console.log('assfsdfsddddddddddddddsdddddddddddddddddddddddddddddddds', width, height);
-
-    if (width < 500) {
-
-      console.log('having low imagee auto croppping the image')
-      image.autocrop();
-      image
-        .clone()
-        .crop({ x: 0, y: 0, w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
-        .write(`${outputDir}/${prefix}-front.png`);
-      image
-        .clone()
-        .crop({ x: 0, y: Math.floor(image.bitmap.height / 2), w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
-        .write(`${outputDir}/${prefix}-back.png`);
-
-      return true;
-    } else {
-      // Check if a pixel matches the border color (with tolerance)
-      const isBorderColor = (r: number, g: number, b: number) => {
-        return (
-          Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
-          Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
-          Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE
-        );
-      };
-
-      // Find horizontal borders (rows)
-      const horizontalBorders = [];
-      for (let y = 0; y < height; y++) {
-        let borderPixels = 0;
-        for (let x = 0; x < width; x++) {
-          const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
-          if (isBorderColor(r, g, b)) borderPixels++;
-        }
-        // Check if this row qualifies as a border
-        if (borderPixels / width >= MIN_BORDER_LENGTH) {
-          horizontalBorders.push(y);
-        }
-      }
-
-      // Debug: Log detected horizontal borders
-      console.log("Horizontal borders:", horizontalBorders);
-
-      // Find vertical borders for each region between horizontal borders
-      const regions = [];
-      for (let i = 0; i < horizontalBorders.length - 1; i++) {
-        const yStart = horizontalBorders[i] + 1;
-        const yEnd = horizontalBorders[i + 1] - 1;
-
-        // Find vertical borders in this region
-        const verticalBorders = [];
-        for (let x = 0; x < width; x++) {
-          let borderPixels = 0;
-          for (let y = yStart; y <= yEnd; y++) {
-            const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
-            if (isBorderColor(r, g, b)) borderPixels++;
-          }
-          // Check if this column qualifies as a border
-          if (borderPixels / (yEnd - yStart + 1) >= MIN_BORDER_LENGTH) {
-            verticalBorders.push(x);
-          }
-        }
-
-        // Debug: Log detected vertical borders for this region
-        console.log(
-          `Vertical borders between rows ${yStart}-${yEnd}:`,
-          verticalBorders
-        );
-
-        // Find regions between vertical borders
-        for (let j = 0; j < verticalBorders.length - 1; j++) {
-          const x = verticalBorders[j] + 1;
-          const y = yStart;
-          const w = verticalBorders[j + 1] - x;
-          const h = yEnd - yStart + 1;
-          // Ensure region has valid dimensions
-          if (w > 0 && h > 0) {
-            regions.push({ x, y, w, h });
-          }
-        }
-      }
-
-      // Save regions as images
-      if (regions.length === 0) {
-        console.log("No regions found. Check border detection above.");
-        return false;
-      }
-
-      fs.mkdirSync(outputDir, { recursive: true });
-      regions.forEach((region, index) => {
-        image
-          .clone()
-          .crop(region)
-          .write(`${outputDir}/${prefix}-${index == 0 ? 'front' : 'back'}.png`);
-      });
-      console.log(`Extracted ${regions.length} images!`);
-      return true;
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    return false;
-  }
-}
 ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
   if (!isUndefined(page)) {
@@ -452,6 +347,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
       if (card?.isConverted) return true;
 
       if (card?.cardType == 'eshram') {
+
         execFile(
           path.join(pdf.path, 'pdfimages'),
           [
@@ -499,10 +395,13 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
           }
         );
+
       } else if (card?.cardType == 'abha') {
+
         console.log("this is converted card", card);
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
+            
             // @ts-ignore
             page.pdfs[i] = card = newCard;
             event.reply('cardMaker-success', page);
@@ -543,12 +442,68 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
           })
           .catch((error) => {
+            console.log('ddddddddddddddddddddddddddddd', error);
+            card.isConverted = false;
+            card.errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || 'Something went wrong while converting the pdf.';
+            // @ts-ignore
+            page.pdfs[i] = card;
+            event.reply('cardMaker-failure', { page, card });
+          });
+      } else if (card?.cardType == 'aadhaar') {
+
+        console.log("this is converted card", card);
+        let isHD = false;
+        // @ts-ignore
+        card.highResolution = isHD = false;
+        pdf2image(card)
+          .then(async (newCard: cardMakerPDF) => {
+            // @ts-ignore
+            page.pdfs[i] = card = newCard;
+            event.reply('cardMaker-success', page);
+            console.log("pdf2image cardMaker-success:", card.originalName);
+
+            let cardName = path.basename(card?.filename, path.extname(card?.filename))
+            let imagePath = path.join(card.path, card.cardBoth as string);
+
+            card.cardFront = `${cardName}-front.png`
+            const frontOutputPath = path.join(card.path, card.cardFront);
+            const frontCropOptions = {
+              left: isHD ? 544 : 272,
+              top: isHD ? 9499 : 4749,
+              width: isHD ? 4317 : 2158,
+              height: isHD ? 2750 : 1375,
+            };
+
+            card.cardBack = `${cardName}-back.png`
+            const backOutputPath = path.join(card.path, card.cardBack);
+            const backCropOptions = {
+              left: isHD ? 5033 : 2516,
+              top: isHD ? 9499 : 4749,
+              width: isHD ? 4317 : 2158,
+              height: isHD ? 2750 : 1375,
+            };
+
+            try {
+              await cropImage(imagePath, frontOutputPath, frontCropOptions);
+              await cropImage(imagePath, backOutputPath, backCropOptions)
+              // @ts-ignore
+              page.pdfs[i] = card;
+              event.reply('cardMaker-image-extracted-success', page);
+              console.log("cardMaker-image-extracted-success");
+            } catch (error) {
+              event.reply('cardMaker-image-extracted-failure', { page, card });
+            }
+
+
+          })
+          .catch((error) => {
             card.isConverted = false;
             card.errorMessage = 'Something went wrong while converting the pdf.'
             // @ts-ignore
             page.pdfs[i] = card;
             event.reply('cardMaker-failure', { page, card });
           });
+
       }
 
 

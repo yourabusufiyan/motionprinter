@@ -16,7 +16,7 @@ import { isUndefined, last } from 'lodash';
 
 import expressAppClass from './express-app'
 import type { cardMaker, cardMakerPDF } from './express-app-d'
-import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard } from './../helpers/cardmakers'
+import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard, extractAadhaarCard } from './../helpers/cardmakers'
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
@@ -212,7 +212,6 @@ ipcMain.on("searchOnlinePCs", (event) => {
 })
 
 
-
 // Handle file read and save
 ipcMain.on('download-file', async (event, file) => {
 
@@ -249,7 +248,7 @@ ipcMain.on('download-file', async (event, file) => {
 
 });
 
-async function pdf2image(file: cardMakerPDF & { highResolution?: boolean }): Promise<cardMakerPDF> {
+async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
   return new Promise((resolve, reject) => {
     let opts = {
       format: 'png',
@@ -262,18 +261,14 @@ async function pdf2image(file: cardMakerPDF & { highResolution?: boolean }): Pro
 
     if (file?.password) {
       opts.args = {
-        'opw': file.password
+        'opw': file.password || path.basename(file.destination, path.extname(file.destination)).toUpperCase()
       }
     }
 
     pdf.info(file.destination, opts)
       .then((pdfinfo: any) => {
 
-        opts.scale = pdfinfo.height_in_pts * (600 / 72)
-
-        if (file?.highResolution) {
-          opts.scale *= 2
-        }
+        opts.scale = Math.abs(pdfinfo.height_in_pts * (300 / 72))
 
         pdf.convert(file.destination, opts)
           .then((res: any) => {
@@ -341,6 +336,8 @@ ipcMain.on("eshrem", async (event, page: cardMaker) => {
 
 ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
+  console.log(page)
+
   if (!isUndefined(page)) {
     page?.pdfs?.filter(async (card, i) => {
 
@@ -371,6 +368,8 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             event.reply('cardMaker-success', page);
             console.log("cardMaker-success:", card.originalName);
 
+            if (card?.isCropped) return;
+
             let cardName = path.basename(card?.filename, path.extname(card?.filename))
             let imagePath = path.join(card.path, `${cardName}-000.png`)
 
@@ -385,8 +384,10 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             if (await extractEshramCard(card.cardBoth, card.path, cardName)) {
               card.cardFront = `${cardName}-front.png`
               card.cardBack = `${cardName}-back.png`
-              // @ts-ignore
-              page.pdfs[i] = card;
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
               event.reply('cardMaker-image-extracted-success', page);
               console.log("cardMaker-image-extracted-success");
             } else {
@@ -398,14 +399,15 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
       } else if (card?.cardType == 'abha') {
 
-        console.log("this is converted card", card);
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
-            
+
             // @ts-ignore
             page.pdfs[i] = card = newCard;
             event.reply('cardMaker-success', page);
             console.log("pdf2image cardMaker-success:", card.originalName);
+
+            if (card?.isCropped) return;
 
             let cardName = path.basename(card?.filename, path.extname(card?.filename))
             let imagePath = path.join(card.path, card.cardBoth as string);
@@ -413,26 +415,28 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             card.cardFront = `${cardName}-front.png`
             const frontOutputPath = path.join(card.path, card.cardFront);
             const frontCropOptions = {
-              left: 89,
-              top: 89,
-              width: 3696,
-              height: 2263,
+              left: 44,
+              top: 44,
+              width: 1892,
+              height: 1131,
             };
 
             card.cardBack = `${cardName}-back.png`
             const backOutputPath = path.join(card.path, card.cardBack);
             const backCropOptions = {
-              left: 89,
-              top: 2448,
-              width: 3696,
-              height: 2263,
+              left: 44,
+              top: 1223,
+              width: 1892,
+              height: 1131,
             };
 
             try {
               await cropImage(imagePath, frontOutputPath, frontCropOptions);
               await cropImage(imagePath, backOutputPath, backCropOptions)
-              // @ts-ignore
-              page.pdfs[i] = card;
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
               event.reply('cardMaker-image-extracted-success', page);
               console.log("cardMaker-image-extracted-success");
             } catch (error) {
@@ -451,10 +455,6 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
           });
       } else if (card?.cardType == 'aadhaar') {
 
-        console.log("this is converted card", card);
-        let isHD = false;
-        // @ts-ignore
-        card.highResolution = isHD = false;
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
             // @ts-ignore
@@ -462,32 +462,20 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             event.reply('cardMaker-success', page);
             console.log("pdf2image cardMaker-success:", card.originalName);
 
+            if (card?.isCropped) return;
+
             let cardName = path.basename(card?.filename, path.extname(card?.filename))
             let imagePath = path.join(card.path, card.cardBoth as string);
 
             card.cardFront = `${cardName}-front.png`
-            const frontOutputPath = path.join(card.path, card.cardFront);
-            const frontCropOptions = {
-              left: isHD ? 544 : 272,
-              top: isHD ? 9499 : 4749,
-              width: isHD ? 4317 : 2158,
-              height: isHD ? 2750 : 1375,
-            };
-
             card.cardBack = `${cardName}-back.png`
-            const backOutputPath = path.join(card.path, card.cardBack);
-            const backCropOptions = {
-              left: isHD ? 5033 : 2516,
-              top: isHD ? 9499 : 4749,
-              width: isHD ? 4317 : 2158,
-              height: isHD ? 2750 : 1375,
-            };
 
             try {
-              await cropImage(imagePath, frontOutputPath, frontCropOptions);
-              await cropImage(imagePath, backOutputPath, backCropOptions)
-              // @ts-ignore
-              page.pdfs[i] = card;
+              await extractAadhaarCard(card)
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
               event.reply('cardMaker-image-extracted-success', page);
               console.log("cardMaker-image-extracted-success");
             } catch (error) {
@@ -498,7 +486,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
           })
           .catch((error) => {
             card.isConverted = false;
-            card.errorMessage = 'Something went wrong while converting the pdf.'
+            card.errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || 'Something went wrong while converting the pdf.';
             // @ts-ignore
             page.pdfs[i] = card;
             event.reply('cardMaker-failure', { page, card });

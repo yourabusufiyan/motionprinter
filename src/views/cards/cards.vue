@@ -5,7 +5,7 @@ import { useLordStore } from "@/stores/LordStore";
 import { v7 as uuidv7 } from 'uuid';
 import { ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron/renderer';
-import { cloneDeep, isEqual, isNull, isObject, toString, merge } from 'lodash';
+import { cloneDeep, isEqual, isNull, isObject, toString, merge, last, find, unionBy, uniqBy } from 'lodash';
 import path from 'path';
 
 // Type imports
@@ -53,16 +53,19 @@ function createNewRepeaterItem(): RepeaterItem {
 }
 
 function saveToMain() {
-  lordStore.db.cardMaker = lordStore.db.cardMaker.map((el: $cardMaker) => {
+  console.log(lordStore.lowdb.data)
+  let data = lordStore.db.cardMaker.map((el: $cardMaker, i: number) => {
     if (el.id === page.value?.id) {
       if (page.value?.pdfs) {
         page.value.pdfs = page.value?.pdfs?.filter((pdf: $cardMakerPDF) => isObject(pdf));
       }
-      return page.value
+      el = merge(el, page.value)
     }
     return el;
   });
-  lordStore.saveMain();
+  console.log("last page: ", last(data))
+  lordStore.lowdb.data = lordStore.db;
+  lordStore.saveLowDB()
 }
 
 const addRepeaterField = () => repeater.value.push(createNewRepeaterItem());
@@ -77,7 +80,8 @@ const handlePasswordChange = async (event: Event, index: number, card: $cardMake
   if (page.value?.pdfs?.length && page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)) {
     page.value.pdfs[index].password = toString(repeater.value[index].password);
     console.log('password sentttttt', page.value)
-    message.value = 'Card processing. Please wait...'
+    message.value = 'Card processing in high quality. Please wait...'
+    isProcessing.value = true;
     ipcRenderer.send('cardMaker', cloneDeep(page.value));
   }
 }
@@ -90,15 +94,9 @@ const handleFileUpload = async (event: Event, index: number) => {
 
   if (!file) return;
 
-  if (card?.cardType == 'aadhaar' && !password) {
-    message.value = 'Please enter the password for the Aadhaar card';
-    // return;
-  }
-
   if (isProcessing.value) {
     messageWarning.value = 'Please wait while processing the card...';
     isDataToProcess.value = true;
-    return;
   }
 
   messageFile.value = file.name;
@@ -129,7 +127,21 @@ const handleFileUpload = async (event: Event, index: number) => {
       message.value = 'Card processing. Please wait...'
       ipcRenderer.send('cardMaker', cloneDeep(response.data));
     }
-    page.value = response.data;
+
+    if (response?.data?.pdfs?.length && page.value?.pdfs?.length) {
+
+      page.value = response.data as $cardMaker;
+
+      let temp = cloneDeep(response.data?.pdfs)
+      page.value.pdfs = []
+      repeater.value.filter((el, i) => {
+        if (page.value?.pdfs?.length) {
+          page.value.pdfs.push(find(temp, ['id', el.id]))
+        }
+      })
+
+    }
+
   } catch (error) {
     repeater.value[index].file = null;
     message.value = axios.isAxiosError(error)
@@ -149,28 +161,27 @@ const resetFields = () => {
 const ipcHandlers = {
   'cardMaker-failure': (event: IpcRendererEvent, response: { page: $cardMaker; card: $cardMakerPDF }) => {
     message.value = response.card.errorMessage || 'PDF conversion failed';
+    if (response.card?.cardType == 'aadhaar' && !response.card.password?.length && response.card?.errorMessage?.length) {
+      message.value = 'Please enter the password for the Aadhaar card';
+    }
     messageFile.value = response.card.originalName || '';
     page.value = merge(page.value, response.page);
     isProcessing.value = false;
-    if (isDataToProcess.value) {
-      ipcRenderer.send('cardMaker', cloneDeep(page.value));
-    }
   },
   'cardMaker-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `Card converted successfully`;
     page.value = merge(page.value, returnPage);
+    saveToMain()
   },
   'cardMaker-image-extracted-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
     message.value = `Image extraction failed`;
     messageFile.value = card.originalName || '';
     isProcessing.value = false;
-    if (isDataToProcess.value) {
-      ipcRenderer.send('cardMaker', cloneDeep(page.value));
-    }
   },
   'cardMaker-image-extracted-success': (event: IpcRendererEvent, file: $cardMaker) => {
     message.value = `Image extracted successfully`;
     page.value = merge(page.value, file);;
+    saveToMain()
     console.log(file)
 
     const warning = file.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
@@ -244,6 +255,8 @@ const onCreate = () => {
 </script>
 
 <template lang="pug">
+pre {{ isProcessing}}
+pre {{ isDataToProcess}}
 .container.mx-auto.p-4
   h2.text-xl.font-bold.mb-4 Make card sheet for 100% free!
   .space-y-4
@@ -318,17 +331,17 @@ const onCreate = () => {
       class="bg-green-400 text-white"
     ) Download PDF
 
-  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.id")
+  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs?.length")
     h2.text-xl.font-bold.mb-4 Generated PDF
 
     .card-container
       .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs?.filter(isObject)" :key="card.id")
-        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
+        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
           img(
             v-if="card?.cardFront"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardFront}`"
             alt="Card front"
-            class="w-full h-auto"
+            class="w-full h-auto max-h-64"
           )
           .w-full.p-4.shadow-sm(v-else)
             Skeleton.w-full.rounded-lg.mb-4(class="h-[100px]")
@@ -339,12 +352,12 @@ const onCreate = () => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
-        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32
+        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
           img(
             v-if="card?.cardBack"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardBack}`"
             alt="Card front"
-            class="w-full h-auto"
+            class="w-full h-auto max-h-64"
           )
           .w-full.p-4.shadow-sm(v-else)
             Skeleton.w-full.rounded-lg.mb-4(class="h-[100px]")
@@ -356,4 +369,6 @@ const onCreate = () => {
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
 
+pre {{ repeater }}
+pre {{ page }}
 </template>

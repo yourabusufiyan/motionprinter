@@ -76,6 +76,146 @@ export async function extractEshrem(pdf: cardMakerPDF): Promise<cardMakerPDF> {
   return pdf
 }
 
+export async function extractAadhaarCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename))
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`)
+
+    const BORDER_COLOR = { r: 0, g: 0, b: 0 };
+    const COLOR_TOLERANCE = 5;
+    const MIN_BORDER_RATIO = 0.65;
+
+    try {
+      const image = await Jimp.read(inputPath);
+      const { width, height, data } = image.bitmap;
+
+      // Precalculate pixel check function
+      const isBorder = (r: number, g: number, b: number) =>
+        Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+        Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+        Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+      // Optimized border detection using buffer directly
+      const getHorizontalBorders = () => {
+        const borders = [];
+        const pixelThreshold = width * MIN_BORDER_RATIO;
+
+        for (let y = 0; y < height; y++) {
+          let borderCount = 0;
+          const yOffset = y * width * 4;
+
+          for (let x = 0; x < width; x++) {
+            const idx = yOffset + x * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(y);
+                break; // Early exit for rows
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Vertical border detection within horizontal regions
+      const getVerticalBorders = (yStart: number, yEnd: number) => {
+        const borders = [];
+        const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+        for (let x = 0; x < width; x++) {
+          let borderCount = 0;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const idx = (y * width + x) * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(x);
+                break; // Early exit for columns
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Main processing
+      const horizontalBorders = getHorizontalBorders();
+      const regions = [];
+
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+        // Generate regions
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const region = {
+            x: verticalBorders[j] + 1,
+            y: yStart,
+            w: verticalBorders[j + 1] - verticalBorders[j] - 1,
+            h: yEnd - yStart + 1,
+          };
+
+          if (region.w > 0 && region.h > 0) {
+            regions.push(region);
+          }
+        }
+      }
+
+      // Save regions
+      if (regions.length === 0) {
+        console.log("No regions found");
+        reject(pdf);
+        return;
+      }
+
+      console.log('regions', regions)
+
+      let isFront = true;
+
+      await Promise.all(
+        regions.map(async (region, index) => {
+          if (region.w < 100) return region;
+
+          console.log("aaddhar croped", index, frontOutputPath, backOutputPath)
+          console.log("region.w < 100croped", region.w < 100)
+
+          let cropped = image.clone().crop(region);
+
+          cropped.write(
+            `${isFront ? frontOutputPath : backOutputPath}-full-.png`
+          );
+          let croppedImage = cropped.bitmap;
+
+          let yPoint = Math.ceil(croppedImage.height * 0.7425);
+          cropped
+            .crop({
+              x: 0,
+              y: yPoint,
+              w: croppedImage.width,
+              h: croppedImage.height - yPoint,
+            })
+            .write(
+              `${isFront ? frontOutputPath : backOutputPath}.png`
+            );
+          isFront = false;
+        })
+      );
+      resolve(pdf)
+
+      console.log(`Extracted aadhaar card`);
+    } catch (error) {
+      console.error("Error:", error);
+      reject(pdf)
+    }
+  })
+}
+
 export async function createA4PDFwithEshremCards(obj: cardMaker) {
 
   if (obj?.pdfs) {

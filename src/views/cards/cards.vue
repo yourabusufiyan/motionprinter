@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from "vue";
+import { useRoute, useRouter } from "vue-router"
 import axios from "axios";
 import { useLordStore } from "@/stores/LordStore";
 import { v7 as uuidv7 } from 'uuid';
@@ -7,6 +8,7 @@ import { ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron/renderer';
 import { cloneDeep, isEqual, isNull, isObject, toString, merge, last, find, unionBy, uniqBy } from 'lodash';
 import path from 'path';
+import { shell } from 'electron';
 
 // Type imports
 import type { $cardMaker, $cardMakerPDF } from '@/declarations/index'
@@ -18,7 +20,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton'
 import { RocketIcon } from '@radix-icons/vue'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2, RotateCcw, FileText, Download, Plus, Trash2, IdCard, Printer } from 'lucide-vue-next'
 
 interface RepeaterItem {
   id: string;
@@ -29,6 +31,9 @@ interface RepeaterItem {
 }
 
 const lordStore = useLordStore();
+const router = useRouter();
+const route = useRoute();
+
 const repeater = ref<RepeaterItem[]>([createNewRepeaterItem()]);
 const page = ref<$cardMaker | null>(null);
 const message = ref('');
@@ -42,6 +47,7 @@ const options = ref([
   { label: "E-Shram", value: "eshram" },
   { label: "Abha", value: "abha" },
   { label: "Aadhaar", value: "aadhaar" },
+  { label: "Ayushman", value: "ayushman" },
 ].sort((a, b) => a.label.localeCompare(b.label)));
 
 function createNewRepeaterItem(): RepeaterItem {
@@ -74,6 +80,7 @@ const removeRepeaterField = (index: number) => {
     page.value.pdfs = page.value?.pdfs?.filter((el: $cardMakerPDF) => el?.id != repeater.value[index]?.id);
   }
   repeater.value.splice(index, 1)
+  saveToMain();
 };
 const handlePasswordChange = async (event: Event, index: number, card: $cardMakerPDF) => {
   console.log('password chnge', page.value?.pdfs?.length, page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id), card)
@@ -106,10 +113,10 @@ const handleFileUpload = async (event: Event, index: number) => {
   const formData = new FormData();
   formData.append("sampleFile", file);
   formData.append("cardMaker", 'true');
-  formData.append("index", index.toString());
-  formData.append("cardType", repeater.value[index].cardType || '');
-  formData.append("id", repeater.value[index].id);
-  formData.append("password", repeater.value[index]?.password || '');
+  formData.append("index", index?.toString());
+  formData.append("cardType", repeater.value[index].cardType?.toString() || '');
+  formData.append("id", repeater.value[index].id.toString());
+  formData.append("password", repeater.value[index]?.password?.toString() || '');
 
   if (page.value?.id) {
     formData.append("makerID", page.value.id);
@@ -135,12 +142,11 @@ const handleFileUpload = async (event: Event, index: number) => {
       let temp = cloneDeep(response.data?.pdfs)
       page.value.pdfs = []
       repeater.value.filter((el, i) => {
-        if (page.value?.pdfs?.length) {
-          page.value.pdfs.push(find(temp, ['id', el.id]))
-        }
+        page.value.pdfs.push(find(temp, ['id', el.id]))
       })
 
     }
+
 
   } catch (error) {
     repeater.value[index].file = null;
@@ -154,7 +160,13 @@ const handleFileUpload = async (event: Event, index: number) => {
 
 const resetFields = () => {
   repeater.value = [createNewRepeaterItem()];
-  page.value?.pdfs?.splice(0);
+  page.value = null
+  message.value = ''
+  messageFile.value = ''
+  messageWarning.value = ''
+  messageWarningFile.value = ''
+  isProcessing.value = false
+  isDataToProcess.value = false
 };
 
 // IPC Event Handlers
@@ -252,11 +264,15 @@ const onCreate = () => {
     ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value));
   }
 };
+
+const onPrint = async () => {
+  shell.openPath(page.value?.outputFile);
+};
+
+
 </script>
 
 <template lang="pug">
-pre {{ isProcessing}}
-pre {{ isDataToProcess}}
 .container.mx-auto.p-4
   h2.text-xl.font-bold.mb-4 Make card sheet for 100% free!
   .space-y-4
@@ -312,26 +328,28 @@ pre {{ isDataToProcess}}
       Button(
         @click="removeRepeaterField(index)"
         variant="destructive"
-      ) Remove
+      ) #[Trash2.py-1] Remove
 
-  .flex.gap-3.mt-4
-    Button(@click="addRepeaterField" variant="outline") + Add New Card
-    Button(
-      @click="resetFields"
-      variant="secondary"
-      class="border border-gray-300"
-    ) Reset All
-
-    Button(@click="onCreate" variant="default") Create PDF
-
+  .flex.gap-3.mt-8.flex-wrap
+    Button(@click="addRepeaterField" variant="outline") #[Plus.py-1.m-0.-ml-2] Add New Card
+    Button(@click="resetFields" variant="destructive" class="border border-gray-300" ) 
+      | #[RotateCcw.px-1.-ml-1] Reset All
+    Button(@click="onCreate" variant="default")
+      | #[FileText.px-1.-ml-1] Create PDF
     Button(
       @click="onDownload"
       :disabled="!page?.outputFile"
       variant="outline"
       class="bg-green-400 text-white"
-    ) Download PDF
+    ) #[Download.px-1.-ml-1] Download PDF
+    Button(
+      @click="onPrint()"
+      v-if="page?.outputFile"
+      variant="outline"
+      class="bg-slate-600 text-white"
+    ) #[Printer.py-1.-ml-1] Print 
 
-  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs?.length")
+  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs")
     h2.text-xl.font-bold.mb-4 Generated PDF
 
     .card-container
@@ -368,7 +386,4 @@ pre {{ isDataToProcess}}
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
-
-pre {{ repeater }}
-pre {{ page }}
 </template>

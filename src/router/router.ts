@@ -48,6 +48,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/card-maker',
+    name: 'card-maker',
     children: CardMakerRoutes
   },
 ];

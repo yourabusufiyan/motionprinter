@@ -11,6 +11,7 @@ import { execFile } from 'child_process'
 import { Jimp } from "jimp";
 import { intToRGBA } from "@jimp/utils";
 import { sleep } from '../../helpers/both'
+import { print } from 'pdf-to-printer';
 
 import { isUndefined, last } from 'lodash';
 
@@ -159,10 +160,6 @@ async function createWindow() {
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
-  // win = null;
-  // if (process.platform !== 'darwin') app.quit();
-});
 
 app.on('second-instance', () => {
   if (win) {
@@ -199,17 +196,8 @@ ipcMain.handle('open-win', (_, arg) => {
   }
 });
 
-ipcMain.on('ping', () => {
-})
-
-ipcMain.on('reloadDatabase', () => {
-})
 
 ipcMain.handle('version', () => app.getVersion());
-
-ipcMain.on("searchOnlinePCs", (event) => {
-  event.sender.send("eventFromMain", 'someReply');
-})
 
 
 // Handle file read and save
@@ -327,11 +315,6 @@ ipcMain.on('pdf2image', async (event, file) => {
 
 });
 
-ipcMain.on("eshrem", async (event, page: cardMaker) => {
-  let eshremPage = await createA4PDFwithEshremCards(page)
-  console.log('eshremPage', eshremPage)
-  event.reply('eshrem-success', eshremPage);
-})
 
 
 ipcMain.on("cardMaker", async (event, page: cardMaker) => {
@@ -397,7 +380,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
           }
         );
 
-      } else if (card?.cardType == 'abha') {
+      } else if (card?.cardType == 'abha' || card?.cardType == 'ayushman') {
 
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
@@ -417,7 +400,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             const frontCropOptions = {
               left: 44,
               top: 44,
-              width: 1892,
+              width: 1848,
               height: 1131,
             };
 
@@ -426,9 +409,21 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             const backCropOptions = {
               left: 44,
               top: 1223,
-              width: 1892,
+              width: 1848,
               height: 1131,
             };
+
+            if (card?.cardType == 'ayushman') {
+              frontCropOptions.left = 438;
+              frontCropOptions.top = 397;
+              frontCropOptions.width = 1272;
+              frontCropOptions.height = 638;
+
+              backCropOptions.left = 1856;
+              backCropOptions.top = 397;
+              backCropOptions.width = 1270;
+              backCropOptions.height = 638;
+            }
 
             try {
               await cropImage(imagePath, frontOutputPath, frontCropOptions);
@@ -449,8 +444,9 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             console.log('ddddddddddddddddddddddddddddd', error);
             card.isConverted = false;
             card.errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || 'Something went wrong while converting the pdf.';
-            // @ts-ignore
-            page.pdfs[i] = card;
+            if (page?.pdfs) {
+              page.pdfs[i] = card;
+            }
             event.reply('cardMaker-failure', { page, card });
           });
       } else if (card?.cardType == 'aadhaar') {
@@ -511,4 +507,12 @@ ipcMain.on("cardMakerCreatePDF", async (event, page: cardMaker) => {
   } else {
     event.reply('cardMakerCreatePDF-failure', page);
   }
+})
+
+ipcMain.on("printFile", async (event, file: any) => {
+  print(file.path, file.options).then(() => {
+    console.log(`Printed file: ${file}`)
+  }).catch(err => {
+    console.error(`Error printing file: ${file}`, err)
+  })
 })

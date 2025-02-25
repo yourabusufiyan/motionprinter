@@ -24,16 +24,26 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Inbox' }
   },
   {
-    path: '/history',
-    name: 'history',
-    component: () => import('../views/HistoryPage.vue'),
-    meta: { title: 'History' }
+    path: '/card-maker',
+    name: 'card-maker',
+    children: CardMakerRoutes
+  },
+  {
+    path: '/photosheet-maker',
+    name: 'photosheet-maker',
+    component: () => import('../views/PhotoSheetMakerPage.vue'),
   },
   {
     path: '/connected-pc',
     name: 'connected-pc',
     component: () => import('../views/ConnectedPC.vue'),
     meta: { title: 'Connected PC' }
+  },
+  {
+    path: '/history',
+    name: 'history',
+    component: () => import('../views/HistoryPage.vue'),
+    meta: { title: 'History' }
   },
   {
     path: '/help',
@@ -45,11 +55,6 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'settings',
     component: () => import('../views/SettingsPage.vue'),
-  },
-  {
-    path: '/card-maker',
-    name: 'card-maker',
-    children: CardMakerRoutes
   },
 ];
 
@@ -72,18 +77,12 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const store = useLordStore()
   await store.reloadDatabase()
-  console.log('after reloading database in router execution before each');
-  console.log('before each', from?.name, ' to ', to?.name);
   if (to.hash) {
     document.querySelector(to.hash)?.scrollIntoView()
   }
   next()
 });
-// router.afterEach(async (to, from) => {
-//   if (to.hash) {
-//     document.getElementById(to.hash)?.scrollIntoView()
-//   }
-// });
+
 
 export default router;
 console.log('[App.vue]', `router ended`);

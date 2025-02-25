@@ -5,7 +5,7 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
   .ml-64.min-h-screen.flex.flex-col
     Header
     main.flex-1.flex.justify-between.flex-col.bg-white
-      .router-container.container.my-3.flex-1
+      .router-container.flex-1
         <router-view/>
       Footer
 

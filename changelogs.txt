@@ -1,7 +1,12 @@
+1.0.7
+* Added
+    1. Photo Sheet Maker
+
 1.0.6
 * bugs
   1. CardMaker
     (i) AADHAAR CARD auto cropped fix
+    (ii) Ayushman card
 
 1.0.5
 * Added

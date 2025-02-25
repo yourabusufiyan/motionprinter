@@ -83,10 +83,8 @@ const removeRepeaterField = (index: number) => {
   saveToMain();
 };
 const handlePasswordChange = async (event: Event, index: number, card: $cardMakerPDF) => {
-  console.log('password chnge', page.value?.pdfs?.length, page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id), card)
   if (page.value?.pdfs?.length && page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)) {
     page.value.pdfs[index].password = toString(repeater.value[index].password);
-    console.log('password sentttttt', page.value)
     message.value = 'Card processing in high quality. Please wait...'
     isProcessing.value = true;
     ipcRenderer.send('cardMaker', cloneDeep(page.value));
@@ -117,6 +115,7 @@ const handleFileUpload = async (event: Event, index: number) => {
   formData.append("cardType", repeater.value[index].cardType?.toString() || '');
   formData.append("id", repeater.value[index].id.toString());
   formData.append("password", repeater.value[index]?.password?.toString() || '');
+  formData.append("addedBy	", lordStore.db.computerName || '');
 
   if (page.value?.id) {
     formData.append("makerID", page.value.id);
@@ -160,7 +159,6 @@ const handleFileUpload = async (event: Event, index: number) => {
 
 const resetFields = () => {
   repeater.value = [createNewRepeaterItem()];
-  page.value = null
   message.value = ''
   messageFile.value = ''
   messageWarning.value = ''
@@ -266,7 +264,18 @@ const onCreate = () => {
 };
 
 const onPrint = async () => {
-  shell.openPath(page.value?.outputFile);
+  ipcRenderer.send('printFile', { path: page.value?.outputFile.toString(), options: { printDialog: true } })
+};
+
+const onMakeNewPDF = async () => {
+  repeater.value = [createNewRepeaterItem()];
+  page.value = null
+  message.value = ''
+  messageFile.value = ''
+  messageWarning.value = ''
+  messageWarningFile.value = ''
+  isProcessing.value = false
+  isDataToProcess.value = false
 };
 
 
@@ -348,6 +357,12 @@ const onPrint = async () => {
       variant="outline"
       class="bg-slate-600 text-white"
     ) #[Printer.py-1.-ml-1] Print 
+    Button(
+      @click="onMakeNewPDF()"
+      v-if="page?.outputFile"
+      variant="outline"
+      class="bg-blue-600 text-white"
+    ) #[Printer.py-1.-ml-1] New PDF
 
   .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs")
     h2.text-xl.font-bold.mb-4 Generated PDF

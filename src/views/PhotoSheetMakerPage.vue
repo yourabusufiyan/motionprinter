@@ -18,26 +18,23 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from '@/components/ui/number-field'
-
 import PhotoItem from './PhotoItem.vue'
 
-import { useMagicKeys, whenever } from '@vueuse/core'
 
-interface Photo {
-  id: number
-  src: string
-  zoom: number
-  rotation: number
-  position: { x: number; y: number },
-  width: number,
-  height: number
-}
+import { useLordStore } from '@/stores/LordStore';
+import axios from 'axios';
+import { merge } from 'lodash';
 
-interface Page {
-  photos: Photo[]
-}
+import type { photoSheet, photoSheetPhoto } from '../../electron/main/express-app-d';
+
+const lordStore = useLordStore();
+
 // State management
-const pages = ref<Page[]>([{ photos: [] }])
+const currentPage = ref<photoSheet>({
+  id: '',
+  photos: [],
+})
+const pages = ref<photoSheet[]>([{ id: '', photos: [] }])
 const currentPageIndex = ref(0)
 const selectedGrid = ref('6x6')
 const selectedPaperSize = ref('a4')
@@ -73,7 +70,6 @@ const paperSizes = [
 ]
 
 // Computed properties
-const currentPage = computed(() => pages.value[currentPageIndex.value])
 const paperSize = computed(() => paperSizes.find((s) => s.value === selectedPaperSize.value)!)
 const gridCells = computed(() => {
   const [cols, rows] = selectedGrid.value.split('x').map(Number)
@@ -122,7 +118,7 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
 
 
 const addNewPage = () => {
-  pages.value.push({ photos: [] })
+  pages.value.push({ id: '', photos: [] })
   currentPageIndex.value = pages.value.length - 1
 }
 
@@ -153,33 +149,67 @@ const handleFileSelect = async (e: Event) => {
 
     const file = files[i]
     const reader = new FileReader()
+    let o: photoSheetPhoto = {
+      src: '',
+      zoom: 1,
+      rotation: 0,
+      position: { x: 0, y: 0 },
+      width: 0,
+      height: 0,
+    } as photoSheetPhoto;
+    let index: number = selectedCellIndex.value as number;
 
     reader.onload = (event) => {
 
       var image = new Image();
       image.src = reader.result as string;
-      const o = {
-        id: Date.now(),
-        src: event.target?.result as string,
-        zoom: 1,
-        rotation: 0,
-        position: { x: 0, y: 0 },
-        width: 0,
-        height: 0,
-      }
       image.onload = function () {
+        // o.src = event.target?.result as string;
         o.width = image.width;
         o.height = image.height;
       };
 
-      if (isSingle) {
-        currentPage.value.photos[selectedCellIndex.value as number] = o
-      } else {
-        currentPage.value.photos.splice(selectedCellIndex.value as number + 1 + i, 0, o)
-      }
     }
     reader.readAsDataURL(file)
+
+    const formData = new FormData();
+    formData.append("sampleFile", file);
+    formData.append("temp", 'true');
+    formData.append("addedBy", lordStore.db.computerName || '');
+
+    try {
+      const response = await axios.post(
+        `http://${lordStore.db.ip}:9457/api/v1/upload/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      let res: photoSheetPhoto = response.data;
+      console.log('response', response.data);
+
+      o = {
+        ...o,
+        ...response.data,
+        ...{ src: `http://localhost:9457/temp/${response.data.filename}` }
+      };
+
+      if (isSingle) {
+        currentPage.value.photos[index as number] = o
+      } else {
+        index = selectedCellIndex.value as number + 1 + i;
+        currentPage.value.photos.splice(index, 0, o)
+      }
+
+    } catch (error) {
+      let message = axios.isAxiosError(error)
+        ? error.response?.data.message || "Upload failed"
+        : "An error occurred while uploading the file.";
+      console.error("Upload error:", error);
+    }
+
   }
+
+
 
 }
 
@@ -243,7 +273,7 @@ onUnmounted(() => {
       multiple
       @change="handleFileSelect"
     )
-      
+    pre {{ currentPage}}
   .scroll-container.right-container.w-52.border-l
     .controls.flex.gap-4.my-8.px-6.flex-wrap
       .info 

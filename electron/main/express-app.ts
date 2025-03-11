@@ -44,7 +44,8 @@ class expressAppClass {
   static dir = [
     join(os.homedir(), app.getName(), "./public/"),
     join(os.homedir(), app.getName(), "./upload/"),
-    join(os.homedir(), app.getName(), "./db/")
+    join(os.homedir(), app.getName(), "./db/"),
+    join(os.homedir(), app.getName(), "./temp/")
   ]
 
   static computerName: string | undefined = process.env.COMPUTERNAME
@@ -91,7 +92,8 @@ class expressAppClass {
       recentlyConnectedPCs: [],
       lastCheckConnectedPC: 0,
       offlineComputers: [],
-      cardMaker: []
+      cardMaker: [],
+      temp: []
     };
   }
 
@@ -173,6 +175,7 @@ class expressAppClass {
     this.app.use(fileUpload())
     this.app.use('/public/', express.static(this.dir[0]));
     this.app.use('/upload/', express.static(this.dir[1]));
+    this.app.use('/temp/', express.static(this.dir[3]));
     this.app.use("/api/v1/", this.router);
     this.app.use((_req: any, _res: any, next: any) => next(createError(404)));
     this.app.use((err: any, req: any, res: any, _next: any) => {
@@ -413,6 +416,9 @@ class expressAppClass {
     let newFileName: string = uuidv7() + extname(sampleFile.name)
     uploadPath = expressAppClass.dir[1] + newFileName;
 
+    if (req.body?.temp == 'true') {
+      uploadPath = expressAppClass.dir[3] + newFileName;
+    }
 
     // Use the mv() method to place the file somewhere on your server
     sampleFile.mv(uploadPath, function (err) {
@@ -429,6 +435,7 @@ class expressAppClass {
       fileData.filename = newFileName
       fileData.path = expressAppClass.dir[1]
       fileData.size = sampleFile.size
+      fileData.temp = req.body?.temp == 'true'
 
       let o: toPrintsCommandsFile = {
         ...fileData, ...{
@@ -480,7 +487,11 @@ class expressAppClass {
         }
 
       } else {
-        expressAppClass.db.data.toPrintsCommands.push(o)
+        if (req.body?.temp == 'true') {
+          expressAppClass.db.data.temp.push(o)
+        } else {
+          expressAppClass.db.data.toPrintsCommands.push(o)
+        }
         res.json(o);
       }
 

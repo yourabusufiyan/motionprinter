@@ -20,6 +20,7 @@ export type uploadFile = {
   filename: string,
   path: string,
   size: number,
+  temp?: boolean,
 }
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -67,4 +68,23 @@ export type cardMaker = {
   path?: string | null,
   outputFile?: string | null,
   pdfs?: cardMakerPDF[],
+}
+
+type Photo = {
+  src?: string,
+  zoom?: number,
+  rotation?: number,
+  position?: { x: number; y: number },
+  width?: number,
+  height?: number,
+}
+
+export type photoSheetPhoto = uploadFile & Photo
+
+export type photoSheet = {
+  id: string,
+  filename?: string,
+  path?: string | null,
+  outputFile?: string | null,
+  photos: photoSheetPhoto[],
 }

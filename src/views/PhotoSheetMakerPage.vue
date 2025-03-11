@@ -23,26 +23,26 @@ import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
 import { ipcRenderer } from 'electron';
 import { cloneDeep, isNull, isUndefined, merge } from 'lodash';
-
 import { useLordStore } from '@/stores/LordStore';
 
 
 import type { photoSheet, photoSheetPhoto } from '../../electron/main/express-app-d';
+import { v7 as uuidv7 } from 'uuid';
 
 const lordStore = useLordStore();
 
 // State management
 const currentPage = ref<photoSheet>({
-  id: '',
+  id: uuidv7().split('-').slice(0, 3).join(''),
   photos: [],
 })
 const pages = ref<photoSheet[]>([{ id: '', photos: [] }])
 const currentPageIndex = ref(0)
-const selectedGrid = ref('6x6')
+const selectedGrid = ref('6x7')
 const selectedPaperSize = ref('a4')
 const cellWidth = ref(50)
 const cellHeight = ref(50)
-const cellGap = ref(2)
+const cellGap = ref(5)
 const paperZoom = ref(1)
 const isRotating = ref(false)
 const rotationStartAngle = ref(0)
@@ -50,6 +50,9 @@ const initialRotation = ref(0)
 const selectedCellIndex = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const pdfContent = ref<HTMLElement | null>(null);
+const isPrinting = ref(false);
+const isPdfDownloading = ref(false);
+
 // Constants
 const gridLayouts = [
   // { label: 'Custom', value: 'custom' },
@@ -77,11 +80,9 @@ const gridCells = computed(() => {
   const [cols, rows] = selectedGrid.value.split('x').map(Number)
   return cols * rows
 })
-
 const gridStyle = computed(() => {
   const [cols, rows] = selectedGrid.value.split('x');
   const isCustom = selectedGrid.value === 'custom';
-
   return {
     gridTemplateColumns: `repeat(${cols}, ${isCustom ? `${cellWidth.value}mm` : '1fr'})`,
     gridTemplateRows: `repeat(${rows}, ${isCustom ? `${cellHeight.value}mm` : '1fr'})`,
@@ -94,6 +95,8 @@ const paperStyle = computed(() => ({
   width: `${paperSize.value.width}mm`,
   height: `${paperSize.value.height}mm`,
 }))
+const isInAction = computed(() => isPrinting.value || isPdfDownloading.value)
+
 
 // Methods
 const handlePaperZoom = (e: WheelEvent) => {
@@ -246,7 +249,7 @@ const doAction = (printPDF: boolean = false) => {
         ${Array.from(document.querySelectorAll('style')).map(element => element.outerHTML).join('')}
         <style>
           @media print {
-            body { margin: 0; }
+            body { margin, padding, border: 0; }
           }
           .grid-cell.cell-empty {
             visibility: hidden;
@@ -254,16 +257,22 @@ const doAction = (printPDF: boolean = false) => {
           .cell-placeholder, .cell-controls {
             display: none !important;
           }
-          
+          .grid-container.text-center {
+            width: 210mm;
+            height: 297mm;
+          }
         </style>
       </head>
       <body>
-        ${pdfContent.value.outerHTML}
+        ${pdfContent.value.innerHTML}
       </body>
     </html>
   `;
 
   console.log('printPDF', printPDF);
+
+  isPdfDownloading.value = printPDF
+  isPrinting.value = !printPDF
 
   let obj = {
     htmlContent,
@@ -276,6 +285,7 @@ const doAction = (printPDF: boolean = false) => {
 
 };
 
+
 onMounted(() => {
   updateDimensions();
   resizeObserver = new ResizeObserver(updateDimensions);
@@ -286,6 +296,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect();
+});
+
+ipcRenderer.on('generate-pdf-reply', (event) => {
+  isPdfDownloading.value = false;
+  isPrinting.value = false;
 });
 
 </script>
@@ -323,7 +338,7 @@ onUnmounted(() => {
       multiple
       @change="handleFileSelect"
     )
-    pre {{ currentPage}}
+    pre.hidden {{ currentPage}}
   .scroll-container.right-container.w-52.border-l.flex.flex-col
     .info.my-8.px-6
       p {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
@@ -347,13 +362,18 @@ onUnmounted(() => {
               SelectLabel Paper Sizes
               SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
 
-        Select(v-model="selectedGrid")
-          SelectTrigger.w-48
-            SelectValue(placeholder="Grid Layout")
-          SelectContent
-            SelectGroup
-              SelectLabel Grid Layouts
-              SelectItem(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
+        select.p-1.w-full(v-model="selectedGrid")
+          option Grid Layouts
+          option(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
+        
+        .hidden
+          Select(v-model="selectedGrid")
+            SelectTrigger.w-48
+              SelectValue(placeholder="Grid Layout")
+            SelectContent
+              SelectGroup
+                SelectLabel Grid Layouts
+                SelectItem(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
 
         NumberField#gap(v-model="cellGap" :min="0" :max="20")
           Label(for="gap") Gap
@@ -375,10 +395,12 @@ onUnmounted(() => {
             NumberFieldDecrement
             NumberFieldInput
             NumberFieldIncrement
-    .action-container.flex.flex-col.px-6.pb-6.space-y-2
-      Button.bg-slate-700(@click="doAction(false)") Print
-      Button(@click="doAction(true)" variant="outline") 
-        Loader2.w-4.h-4.mr-2.animate-spin(v-if="false")
+    .action-container.flex.flex-col.px-6.pb-6.space-y-2(:class="{'cursor-not-allowed': isInAction}")
+      Button.bg-slate-700(@click="doAction(false)" :disabled="isInAction" ) 
+        Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
+        | Print
+      Button(@click="doAction(true)" variant="outline" :disabled="isInAction") 
+        Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPdfDownloading")
         | Download PDF
 </template>
 

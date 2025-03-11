@@ -17,6 +17,8 @@ footer.footer.bg-white.px-5.py-4.border-t( class="dark:bg-gray-900" )
       | . All Rights Reserved.
 
     .flex.mt-4(class="sm:justify-center sm:mt-0")
-      p Made with &#10084; in
+      p 
+        | Made with &#10084; in
         img.inline.w-auto.mx-1(:src="flagUrl" style="height: 2cap")
+        | by #[a.uppercase.font-medium.font-sm(href="https://yourabusufiyan.pages.dev/" class="hover:underline" target="_blank") abu sufiyan ]
 </template>

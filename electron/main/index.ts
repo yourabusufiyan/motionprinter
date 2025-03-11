@@ -134,8 +134,6 @@ async function createWindow() {
       event.preventDefault(); // Prevent the window from closing
       win?.hide(); // Hide the window instead
     }
-    // win = null;
-    // expressAppClass.shutdown();
   });
 
   // Quit the app when the tray icon is right-clicked and "Quit" is selected
@@ -518,29 +516,12 @@ ipcMain.on("printFile", async (event, file: any) => {
 })
 
 
-// Handle print request from the renderer process
-ipcMain.on('print-element', (event, htmlContent) => {
-  console.log(`Printing element`);
-  const printWindow = new BrowserWindow({ show: false }); // Hide the window
-  printWindow.loadURL(htmlContent);
-
-  printWindow.webContents.on('did-finish-load', () => {
-    printWindow.webContents.print({ silent: false }, (success, errorType) => {
-      if (!success) {
-        console.error('Printing failed:', errorType);
-      }
-      printWindow.close(); // Close the window after printing
-    });
-  });
-});
-
-
-ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: boolean, printPDF?: boolean, filename?: string }) => {
+ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: boolean, printPDF?: boolean, filename?: string, }) => {
 
   console.log('generate-pdf')
 
   const win = new BrowserWindow({
-    show: false,
+    show: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -574,17 +555,32 @@ ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: b
         defaultPath: path.join(os.homedir(), 'Downloads', obj?.filename || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`),
       });
 
-      if (canceled || !filePath) {
-        return;
+      if (!canceled || filePath) {
+        fs.writeFileSync(filePath, data)
       }
 
-      fs.writeFileSync(filePath, data)
+      win.close();
+      event.reply('generate-pdf-reply', { success: true, message: 'Printed successfully' })
     }
 
     if (obj?.isPrint) {
       console.log('Printing...')
-      win.webContents.print({ silent: false }, () => {
+
+      const printOptions = {
+        silent: false,
+        printBackground: true,
+        color: true,
+        margins: {
+          marginType: 'none' as "none", // 'none', 'printableArea', or custom
+        },
+        pageSize: "A4" as "A4",
+        printSelectionOnly: false,
+        landscape: false,
+      }
+
+      win.webContents.print(printOptions, () => {
         win.close();
+        event.reply('generate-pdf-reply', { success: true, message: 'Printed successfully' })
       })
     }
 

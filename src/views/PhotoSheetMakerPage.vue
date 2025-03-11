@@ -19,11 +19,13 @@ import {
   NumberFieldInput,
 } from '@/components/ui/number-field'
 import PhotoItem from './PhotoItem.vue'
-
+import { Loader2 } from 'lucide-vue-next'
+import axios from 'axios'
+import { ipcRenderer } from 'electron';
+import { cloneDeep, isNull, isUndefined, merge } from 'lodash';
 
 import { useLordStore } from '@/stores/LordStore';
-import axios from 'axios';
-import { merge } from 'lodash';
+
 
 import type { photoSheet, photoSheetPhoto } from '../../electron/main/express-app-d';
 
@@ -47,10 +49,10 @@ const rotationStartAngle = ref(0)
 const initialRotation = ref(0)
 const selectedCellIndex = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
-
+const pdfContent = ref<HTMLElement | null>(null);
 // Constants
 const gridLayouts = [
-  { label: 'Custom', value: 'custom' },
+  // { label: 'Custom', value: 'custom' },
   { label: '1 Photo', value: '1x1' },
   { label: '2 Photos', value: '1x2' },
   { label: '4 Photos', value: '2x2' },
@@ -86,8 +88,6 @@ const gridStyle = computed(() => {
     ...(isCustom ? {} : { gap: `${cellGap.value}mm` })
   };
 });
-
-
 const paperStyle = computed(() => ({
   transform: `scale(${paperZoom.value})`,
   transformOrigin: 'center center',
@@ -102,6 +102,7 @@ const handlePaperZoom = (e: WheelEvent) => {
     paperZoom.value *= e.deltaY > 0 ? 0.95 : 1.05
     paperZoom.value = Math.min(Math.max(0.5, paperZoom.value), 3)
   }
+
 }
 
 const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
@@ -229,6 +230,52 @@ const updateDimensions = () => {
   }
 };
 
+
+const doAction = (printPDF: boolean = false) => {
+
+  if (!pdfContent.value) {
+    console.error('Element not found', pdfContent.value);
+    return;
+  };
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>MP Photosheet - ${currentPage.value.id}</title>
+        ${Array.from(document.querySelectorAll('style')).map(element => element.outerHTML).join('')}
+        <style>
+          @media print {
+            body { margin: 0; }
+          }
+          .grid-cell.cell-empty {
+            visibility: hidden;
+          }
+          .cell-placeholder, .cell-controls {
+            display: none !important;
+          }
+          
+        </style>
+      </head>
+      <body>
+        ${pdfContent.value.outerHTML}
+      </body>
+    </html>
+  `;
+
+  console.log('printPDF', printPDF);
+
+  let obj = {
+    htmlContent,
+    printPDF: printPDF,
+    isPrint: !printPDF,
+    filename: `mp-photosheet-${currentPage.value.id}.pdf`,
+  }
+
+  ipcRenderer.send('generate-pdf', obj);
+
+};
+
 onMounted(() => {
   updateDimensions();
   resizeObserver = new ResizeObserver(updateDimensions);
@@ -247,13 +294,16 @@ onUnmounted(() => {
 .parent-container.flex.w-full.overflow-hidden
   .scroll-container.left-container.flex-1.bg-blue-200
     .paper-container(@wheel="handlePaperZoom")
-      .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle")
-        .grid-container.text-center(:style="gridStyle")
+      .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle" ref="pdfContent")
+        .grid-container.text-center( :style="gridStyle")
           .grid-cell(
             v-for="(cell, index) in gridCells"
             :key="index"
             @click="handleCellClick(index, $event, true)"
             :ref="(el) => setCellRef(el, index)"
+            :class=`{
+              "cell-empty": !currentPage.photos[index]
+            }`
           )
             PhotoItem(
               v-if="currentPage.photos[index]"
@@ -261,7 +311,7 @@ onUnmounted(() => {
               @remove="removePhoto(currentPageIndex, index)"
               :update-photo="currentPage.photos[index]"
             )
-            .placeholder.p-3(
+            .cell-placeholder.p-3(
               v-else
               @click="handleCellClick(index, $event, false)"
             ) Click to add photo
@@ -274,58 +324,62 @@ onUnmounted(() => {
       @change="handleFileSelect"
     )
     pre {{ currentPage}}
-  .scroll-container.right-container.w-52.border-l
-    .controls.flex.gap-4.my-8.px-6.flex-wrap
-      .info 
-        p {{CellWidth}}#[span.font-bold x]{{CellHeight}} (PX)
-        p {{parseFloat(CellWidth*0.2645833333).toFixed(2)}}#[span.font-bold x]{{parseFloat(CellHeight*0.2645833333).toFixed(2)}} (MM)
-      
-      Button.hidden(@click="addNewPage" variant="outline") New Page
-      Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
-      .hidden
-        Select(v-model="currentPageIndex")
-          SelectTrigger.w-32
-            SelectValue(placeholder="Page")
+  .scroll-container.right-container.w-52.border-l.flex.flex-col
+    .info.my-8.px-6
+      p {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
+      p {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
+    .controls.flex-1
+      .flex.gap-4.my-8.px-6.flex-wrap
+        Button.hidden(@click="addNewPage" variant="outline") New Page
+        Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
+        .hidden
+          Select(v-model="currentPageIndex")
+            SelectTrigger.w-32
+              SelectValue(placeholder="Page")
+            SelectContent
+              SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
+
+        Select(v-model="selectedPaperSize")
+          SelectTrigger.w-48
+            SelectValue(placeholder="Paper Size")
           SelectContent
-            SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
+            SelectGroup
+              SelectLabel Paper Sizes
+              SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
 
-      Select(v-model="selectedPaperSize")
-        SelectTrigger.w-48
-          SelectValue(placeholder="Paper Size")
-        SelectContent
-          SelectGroup
-            SelectLabel Paper Sizes
-            SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
+        Select(v-model="selectedGrid")
+          SelectTrigger.w-48
+            SelectValue(placeholder="Grid Layout")
+          SelectContent
+            SelectGroup
+              SelectLabel Grid Layouts
+              SelectItem(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
 
-      Select(v-model="selectedGrid")
-        SelectTrigger.w-48
-          SelectValue(placeholder="Grid Layout")
-        SelectContent
-          SelectGroup
-            SelectLabel Grid Layouts
-            SelectItem(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
+        NumberField#gap(v-model="cellGap" :min="0" :max="20")
+          Label(for="gap") Gap
+          NumberFieldContent
+            NumberFieldDecrement
+            NumberFieldInput
+            NumberFieldIncrement
 
-      NumberField#gap(v-model="cellGap" :min="0" :max="20")
-        Label(for="gap") Gap
-        NumberFieldContent
-          NumberFieldDecrement
-          NumberFieldInput
-          NumberFieldIncrement
+        NumberField#cellWidth(v-model="cellWidth" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
+          Label(for="cellWidth") Cell Width (mm):
+          NumberFieldContent
+            NumberFieldDecrement
+            NumberFieldInput
+            NumberFieldIncrement
 
-      NumberField#cellWidth(v-model="cellWidth" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
-        Label(for="cellWidth") Cell Width (mm):
-        NumberFieldContent
-          NumberFieldDecrement
-          NumberFieldInput
-          NumberFieldIncrement
-
-      NumberField#cellHeight(v-model="cellHeight" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
-        Label(for="cellHeight") Cell Height (mm):
-        NumberFieldContent
-          NumberFieldDecrement
-          NumberFieldInput
-          NumberFieldIncrement
-
+        NumberField#cellHeight(v-model="cellHeight" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
+          Label(for="cellHeight") Cell Height (mm):
+          NumberFieldContent
+            NumberFieldDecrement
+            NumberFieldInput
+            NumberFieldIncrement
+    .action-container.flex.flex-col.px-6.pb-6.space-y-2
+      Button.bg-slate-700(@click="doAction(false)") Print
+      Button(@click="doAction(true)" variant="outline") 
+        Loader2.w-4.h-4.mr-2.animate-spin(v-if="false")
+        | Download PDF
 </template>
 
 <style lang="stylus" scoped>
@@ -363,12 +417,14 @@ onUnmounted(() => {
   gap 2mm
   padding 5mm
 
-.grid-cell
-  border 1px dashed #ccc
+.grid-cell 
   position relative
   overflow hidden
+  border 1px solid #000
+  &.cell-empty
+    border 1px dashed #ccc
 
-.placeholder
+.cell-placeholder
   display flex
   align-items center
   justify-content center

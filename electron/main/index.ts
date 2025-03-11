@@ -516,3 +516,81 @@ ipcMain.on("printFile", async (event, file: any) => {
     console.error(`Error printing file: ${file}`, err)
   })
 })
+
+
+// Handle print request from the renderer process
+ipcMain.on('print-element', (event, htmlContent) => {
+  console.log(`Printing element`);
+  const printWindow = new BrowserWindow({ show: false }); // Hide the window
+  printWindow.loadURL(htmlContent);
+
+  printWindow.webContents.on('did-finish-load', () => {
+    printWindow.webContents.print({ silent: false }, (success, errorType) => {
+      if (!success) {
+        console.error('Printing failed:', errorType);
+      }
+      printWindow.close(); // Close the window after printing
+    });
+  });
+});
+
+
+ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: boolean, printPDF?: boolean, filename?: string }) => {
+
+  console.log('generate-pdf')
+
+  const win = new BrowserWindow({
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    }
+  });
+
+  try {
+
+    await win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(obj.htmlContent)}`);
+
+    if (obj?.printPDF) {
+      console.log('Printing to PDF...')
+      const pdfOptions = {
+        margins: {
+          marginType: 'printableArea' as "printableArea", // 'none', 'printableArea', or custom
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0
+        }, // Default margins
+        pageSize: "A4" as "A4",
+        printBackground: true,
+        printSelectionOnly: false,
+        landscape: false,
+      };
+
+      const data = await win.webContents.printToPDF(pdfOptions);
+
+      const { canceled, filePath } = await dialog.showSaveDialog(win as BrowserWindow, {
+        title: 'Save PDF',
+        defaultPath: path.join(os.homedir(), 'Downloads', obj?.filename || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`),
+      });
+
+      if (canceled || !filePath) {
+        return;
+      }
+
+      fs.writeFileSync(filePath, data)
+    }
+
+    if (obj?.isPrint) {
+      console.log('Printing...')
+      win.webContents.print({ silent: false }, () => {
+        win.close();
+      })
+    }
+
+
+  } catch (error) {
+    console.error(error)
+  }
+
+});

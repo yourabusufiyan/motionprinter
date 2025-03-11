@@ -82,7 +82,7 @@ div.photo-item(
     ref="image"
   )
 
-  div.controls
+  .cell-controls
     Button(@click="$emit('remove')" variant="destructive" size="sm") Remove
 </template>
 
@@ -101,7 +101,7 @@ div.photo-item(
     object-fit: cover;
     object-position: center;
   
-  .controls
+  .cell-controls
     position absolute
     bottom 10px
     left 50%

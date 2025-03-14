@@ -38,7 +38,9 @@ const startDrag = (e: MouseEvent | TouchEvent) => {
   return;
   isDragging.value = true
   startPos.value = {
+    //@ts-ignore
     x: 'clientX' in e ? e.clientX : e.touches[0].clientX,
+    //@ts-ignore
     y: 'clientY' in e ? e.clientY : e.touches[0].clientY,
   }
   document.addEventListener('mousemove', handleDrag)

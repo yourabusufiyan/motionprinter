@@ -19,24 +19,27 @@ import {
   NumberFieldInput,
 } from '@/components/ui/number-field'
 import PhotoItem from './PhotoItem.vue'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
+
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
 import { ipcRenderer } from 'electron';
 import { cloneDeep, isNull, isUndefined, merge } from 'lodash';
 import { useLordStore } from '@/stores/LordStore';
-
-
-import type { photoSheet, photoSheetPhoto } from '../../electron/main/express-app-d';
 import { v7 as uuidv7 } from 'uuid';
+
+import type { $photoSheetPhoto, $photoSheet } from '@/declarations';
 
 const lordStore = useLordStore();
 
 // State management
-const currentPage = ref<photoSheet>({
+const currentPage = ref<$photoSheet>({
   id: uuidv7().split('-').slice(0, 3).join(''),
   photos: [],
 })
-const pages = ref<photoSheet[]>([{ id: '', photos: [] }])
+const pages = ref<$photoSheet[]>([{ id: '', photos: [] }])
 const currentPageIndex = ref(0)
 const selectedGrid = ref('6x7')
 const selectedPaperSize = ref('a4')
@@ -62,7 +65,6 @@ const gridLayouts = [
   { label: '9 Photos', value: '3x3' },
   { label: '16 Photos', value: '4x4' },
   { label: '24 Photos', value: '4x6' },
-  { label: '25 Photos', value: '5x5' },
   { label: '30 Photos(5x6)', value: '5x6' },
   { label: '30 Photos(6x5)', value: '6x5' },
   { label: '36 Photos', value: '6x6' },
@@ -77,17 +79,10 @@ const paperSizes = [
 // Computed properties
 const paperSize = computed(() => paperSizes.find((s) => s.value === selectedPaperSize.value)!)
 const gridCells = computed(() => {
-  const [cols, rows] = selectedGrid.value.split('x').map(Number)
-  return cols * rows
+  return gridCellsFunc(selectedGrid.value)
 })
 const gridStyle = computed(() => {
-  const [cols, rows] = selectedGrid.value.split('x');
-  const isCustom = selectedGrid.value === 'custom';
-  return {
-    gridTemplateColumns: `repeat(${cols}, ${isCustom ? `${cellWidth.value}mm` : '1fr'})`,
-    gridTemplateRows: `repeat(${rows}, ${isCustom ? `${cellHeight.value}mm` : '1fr'})`,
-    ...(isCustom ? {} : { gap: `${cellGap.value}mm` })
-  };
+  return gridStyleFunc(selectedGrid.value, cellGap.value.toString() + 'mm')
 });
 const paperStyle = computed(() => ({
   transform: `scale(${paperZoom.value})`,
@@ -99,6 +94,21 @@ const isInAction = computed(() => isPrinting.value || isPdfDownloading.value)
 
 
 // Methods
+
+function gridCellsFunc(val: string) {
+  const [cols, rows] = val.split('x').map(Number)
+  return cols * rows
+}
+function gridStyleFunc(val: string, gap: string = '5mm') {
+  const [cols, rows] = val.split('x');
+  const isCustom = val === 'custom';
+  return {
+    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+    gridTemplateRows: `repeat(${rows}, 1fr)`,
+    gap
+  }
+}
+
 const handlePaperZoom = (e: WheelEvent) => {
   if (e.ctrlKey) {
     e.preventDefault()
@@ -111,8 +121,59 @@ const handlePaperZoom = (e: WheelEvent) => {
 const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
   e.stopPropagation()
   if (copy && e.altKey && currentPage.value.photos[index]) {
-    console.log('selected cell ', currentPage.value.photos[index])
-    currentPage.value.photos.splice(index + 1, 0, { ...currentPage.value.photos[index] })
+
+    console.log('selected cell ', currentPage.value.photos[index], currentPage.value.photos.length)
+    // currentPage.value.photos.splice(index + 1, 0, { ...currentPage.value.photos[index] })
+
+    let arr = currentPage.value.photos;
+    let totalGrid = gridCells.value;
+    let i = index;
+
+    if (totalGrid == (i + 1)) {
+      console.log('no next to copy')
+      return;
+    }
+
+    let nextFilled = -1;
+    for (let j = i + 1; j <= totalGrid; j++) {
+      if (arr[j] && nextFilled < 0 && arr[i]?.id != arr[j]?.id) {
+        nextFilled = j
+        console.log('Next Filled value is  : ', j)
+        break;
+      }
+      if (j >= arr.length) {
+        if (!arr[j]) {
+          nextFilled = j
+          break;
+        } else if (arr[i]?.id == arr[j]?.id) {
+          continue;
+        }
+      }
+    }
+    console.log('nextFilled', nextFilled)
+
+    if (nextFilled > 0) {
+      for (let k = i + 1; k <= nextFilled; k++) {
+        if (k == nextFilled) {
+          console.log("no null between next filled, replacinv with splice")
+          arr.splice(i, 0, arr[i])
+          break;
+        }
+
+        if (!arr[k]) {
+          console.log('copied to ', k)
+          arr.splice(k, 1, arr[i])
+          break;
+        }
+      }
+    }
+
+    if (arr.length > totalGrid) {
+      arr.splice(totalGrid)
+    }
+
+    console.log('final arra length: ', arr.length)
+
   } else if (!copy) {
     selectedCellIndex.value = index
     fileInput.value?.click()
@@ -141,7 +202,7 @@ const findNextEmptyCell = (startIndex: number) => {
 }
 
 const removePhoto = (pageIndex: number, photoIndex: number) => {
-  pages.value[pageIndex].photos.splice(photoIndex, 1)
+  currentPage.value.photos.splice(photoIndex, 1)
 }
 
 const handleFileSelect = async (e: Event) => {
@@ -153,14 +214,14 @@ const handleFileSelect = async (e: Event) => {
 
     const file = files[i]
     const reader = new FileReader()
-    let o: photoSheetPhoto = {
+    let o: $photoSheetPhoto = {
       src: '',
       zoom: 1,
       rotation: 0,
       position: { x: 0, y: 0 },
       width: 0,
       height: 0,
-    } as photoSheetPhoto;
+    } as $photoSheetPhoto;
     let index: number = selectedCellIndex.value as number;
 
     reader.onload = (event) => {
@@ -188,7 +249,7 @@ const handleFileSelect = async (e: Event) => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
-      let res: photoSheetPhoto = response.data;
+      let res: $photoSheetPhoto = response.data;
       console.log('response', response.data);
 
       o = {
@@ -213,6 +274,9 @@ const handleFileSelect = async (e: Event) => {
 
   }
 
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 
 
 }
@@ -308,8 +372,8 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
 <template lang="pug">
 .parent-container.flex.w-full.overflow-hidden
   .scroll-container.left-container.flex-1.bg-blue-200
-    .paper-container(@wheel="handlePaperZoom")
-      .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle" ref="pdfContent")
+    .paper-container.flex.justify-center.items-center
+      .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle" ref="pdfContent" @wheel="handlePaperZoom")
         .grid-container.text-center( :style="gridStyle")
           .grid-cell(
             v-for="(cell, index) in gridCells"
@@ -339,62 +403,67 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
       @change="handleFileSelect"
     )
     pre.hidden {{ currentPage}}
-  .scroll-container.right-container.w-52.border-l.flex.flex-col
-    .info.my-8.px-6
+  .scroll-container.right-container.w-52.border-l.flex.flex-col.space-y-4
+    .info.px-6
       p {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
       p {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
-    .controls.flex-1
-      .flex.gap-4.my-8.px-6.flex-wrap
-        Button.hidden(@click="addNewPage" variant="outline") New Page
-        Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
-        .hidden
-          Select(v-model="currentPageIndex")
-            SelectTrigger.w-32
-              SelectValue(placeholder="Page")
-            SelectContent
-              SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
+    ScrollArea.flex-1.px-6(class="rounded-md border")
+      Accordion(type="single", collapsible)
+        AccordionItem(value="options")
+          AccordionTrigger.text-lg Page Options
+          AccordionContent.space-y-4
 
-        Select(v-model="selectedPaperSize")
-          SelectTrigger.w-48
-            SelectValue(placeholder="Paper Size")
-          SelectContent
-            SelectGroup
-              SelectLabel Paper Sizes
-              SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
+            Button.hidden(@click="addNewPage" variant="outline") New Page
+            Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
+            .hidden
+              Select(v-model="currentPageIndex")
+                SelectTrigger.w-32
+                  SelectValue(placeholder="Page")
+                SelectContent
+                  SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
 
-        select.p-1.w-full(v-model="selectedGrid")
-          option Grid Layouts
-          option(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
-        
-        .hidden
-          Select(v-model="selectedGrid")
-            SelectTrigger.w-48
-              SelectValue(placeholder="Grid Layout")
-            SelectContent
-              SelectGroup
-                SelectLabel Grid Layouts
-                SelectItem(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
+            Select(v-model="selectedPaperSize")
+              SelectTrigger.w-48
+                SelectValue(placeholder="Paper Size")
+              SelectContent
+                SelectGroup
+                  SelectLabel Paper Sizes
+                  SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
+            
+            div
+              Label Grid Layouts
+              select.mt-1.p-1.w-full(v-model="selectedGrid")
+                option Grid Layouts
+                option(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
+            
 
-        NumberField#gap(v-model="cellGap" :min="0" :max="20")
-          Label(for="gap") Gap
-          NumberFieldContent
-            NumberFieldDecrement
-            NumberFieldInput
-            NumberFieldIncrement
+            NumberField#gap(v-model="cellGap" :min="0" :max="20")
+              Label(for="gap") Gap
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
 
-        NumberField#cellWidth(v-model="cellWidth" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
-          Label(for="cellWidth") Cell Width (mm):
-          NumberFieldContent
-            NumberFieldDecrement
-            NumberFieldInput
-            NumberFieldIncrement
+            NumberField#cellWidth(v-model="cellWidth" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
+              Label(for="cellWidth") Cell Width (mm):
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
 
-        NumberField#cellHeight(v-model="cellHeight" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
-          Label(for="cellHeight") Cell Height (mm):
-          NumberFieldContent
-            NumberFieldDecrement
-            NumberFieldInput
-            NumberFieldIncrement
+            NumberField#cellHeight(v-model="cellHeight" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
+              Label(for="cellHeight") Cell Height (mm):
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
+        AccordionItem(value="grids")
+          AccordionTrigger.text-lg Layouts
+          AccordionContent.bg-gray-50.py-4
+            .space-y-3.mx-4.bg-white.shadow-sm( :style="{ aspectRatio: '210/297' }")
+              .grid-container.text-center.w-full.border.border-2.p-1(v-for="layout in gridLayouts" :style="gridStyleFunc(layout.value, '1mm')")
+                Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
+                
     .action-container.flex.flex-col.px-6.pb-6.space-y-2(:class="{'cursor-not-allowed': isInAction}")
       Button.bg-slate-700(@click="doAction(false)" :disabled="isInAction" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")

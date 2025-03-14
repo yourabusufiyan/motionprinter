@@ -132,7 +132,7 @@ class expressAppClass {
 
     // if db file does not exist, create it
     this.dir.map(el => (!existsSync(el)) && mkdirSync(el, { recursive: true }))
-    this.db.data = { ...this.defaultLordData(), ...this.db.data }
+    this.db.data = { ...this.defaultLordData(), ...this.db.data, ...pick(this.defaultLordData(), ['computerName']) }
     this.db.write()
 
     this.routesInit()
@@ -189,11 +189,21 @@ class expressAppClass {
 
   static intervalInit(): void {
 
-
     setTimeout(async () => {
       while (true) {
 
-        if (this.ip == '127.0.0.1') break;
+        if (ip.address() != this.ip) {
+          console.log('Changed IP, reloading server')
+          app.relaunch({ args: process.argv.slice(1).concat(['--relaunch']) })
+          app.exit(0)
+          break;
+        }
+
+        if (this.ip == '127.0.0.1') {
+          console.log('Local IP, waiting for 10 seconds')
+          this.addresses = ['127.0.0.1']
+          this.isFirstLoop || await sleep(10_000)
+        }
 
         if (this.isFirstLoop) {
           this.db.data.ConnectedPCs = []
@@ -265,8 +275,6 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
-
-        // console.log('onlineAddresses', this.onlineAddresses)
 
         if (!size(this.onlineAddresses)) {
           await sleep(1000)
@@ -642,6 +650,7 @@ class expressAppClass {
 
       return true;
     })
+
   }
 
 

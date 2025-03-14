@@ -6,7 +6,6 @@ import { ReloadIcon } from '@radix-icons/vue'
 // import the Type
 import type { Printer, localPrinter } from '../declarations/PrintersList';
 import type { connectedPC } from './../declarations/LordStore.d'
-import { ip_to_sequence, checkPing } from '../../helpers/both'
 
 // Vue and its dependencies
 import { ref, toDisplayString } from 'vue';
@@ -59,6 +58,7 @@ async function loadComputers(force: boolean = false) {
 
 
 <template lang="pug">
+  .container.w-100.py-8
     .connectedPC-container
 
       .hidden.reload-button-container.mb-8(

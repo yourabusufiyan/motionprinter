@@ -521,7 +521,7 @@ ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: b
   console.log('generate-pdf')
 
   const win = new BrowserWindow({
-    show: true,
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

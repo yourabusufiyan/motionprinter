@@ -70,7 +70,7 @@ export type cardMaker = {
   pdfs?: cardMakerPDF[],
 }
 
-type Photo = {
+export type Photo = {
   src?: string,
   zoom?: number,
   rotation?: number,

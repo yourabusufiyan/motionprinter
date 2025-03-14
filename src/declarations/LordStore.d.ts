@@ -1,6 +1,6 @@
 import { toDisplayString } from "vue";
 import type { Printer, } from "pdf-to-printer";
-import type { toPrintsCommandsFile, Trash, cardMaker, uploadFile } from "../../electron/main/express-app-d"
+import type { toPrintsCommandsFile, Trash, cardMaker, uploadFile, photoSheetPhoto } from "../../electron/main/express-app-d"
 import type { localPrinter } from "./PrintersList"
 
 export type lordData = {

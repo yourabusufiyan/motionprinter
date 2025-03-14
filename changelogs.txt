@@ -1,3 +1,19 @@
+1.0.8
+* Improvements
+  * get computerName on app start
+  * detected ip change and reload app
+  * on local ip wait for the 10 second to next move
+  * scaling working now
+  * to be fixed for re-selecting same image in photosheet maker
+  * dupclicating the image to the null objects
+  * print to pdf is not working will the styles - undone
+  * image is not removing
+  * page scaling at center working now
+* Added 
+  1. Skeleton for photosheet page in photoSheet Maker - undone
+  2. Custom Front and Back card in CardMaker - undone
+  3. re arrage the images in photoSheet maker - undone
+
 1.0.7
 * Added
     1. Photo Sheet Maker

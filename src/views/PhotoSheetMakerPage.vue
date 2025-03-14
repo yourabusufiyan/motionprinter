@@ -55,6 +55,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const pdfContent = ref<HTMLElement | null>(null);
 const isPrinting = ref(false);
 const isPdfDownloading = ref(false);
+const defaultAccordion = 'options';
 
 // Constants
 const gridLayouts = [
@@ -404,14 +405,14 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
     )
     pre.hidden {{ currentPage}}
   .scroll-container.right-container.w-52.border-l.flex.flex-col.space-y-4
-    .info.px-6
+    .info.px-6.pt-4
       p {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
       p {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
-    ScrollArea.flex-1.px-6(class="rounded-md border")
-      Accordion(type="single", collapsible)
+    ScrollArea.flex-1.px-6.shadow-inner.shadow-sm.border-y
+      Accordion(:default-value="defaultAccordion" type="multiple")
         AccordionItem(value="options")
           AccordionTrigger.text-lg Page Options
-          AccordionContent.space-y-4
+          AccordionContent.space-y-4.w-full
 
             Button.hidden(@click="addNewPage" variant="outline") New Page
             Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
@@ -422,7 +423,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 SelectContent
                   SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
 
-            Select(v-model="selectedPaperSize")
+            Select.max-w-full(v-model="selectedPaperSize")
               SelectTrigger.w-48
                 SelectValue(placeholder="Paper Size")
               SelectContent
@@ -437,7 +438,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 option(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
             
 
-            NumberField#gap(v-model="cellGap" :min="0" :max="20")
+            NumberField#gap(v-model="cellGap" v-if="selectedGrid != '1x1'" :min="0" :max="20")
               Label(for="gap") Gap
               NumberFieldContent
                 NumberFieldDecrement
@@ -457,14 +458,21 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 NumberFieldDecrement
                 NumberFieldInput
                 NumberFieldIncrement
+
         AccordionItem(value="grids")
           AccordionTrigger.text-lg Layouts
           AccordionContent.bg-gray-50.py-4
             .space-y-3.mx-4.bg-white.shadow-sm( :style="{ aspectRatio: '210/297' }")
-              .grid-container.text-center.w-full.border.border-2.p-1(v-for="layout in gridLayouts" :style="gridStyleFunc(layout.value, '1mm')")
+              .grid-container.text-center.w-full.border.border-2.p-1(
+                v-for="layout in gridLayouts"
+                @click.prevent="selectedGrid = layout.value"
+                :class=`{"border-slate-500" : selectedGrid == layout.value}`
+                :style="gridStyleFunc(layout.value, '1mm')"
+                class="hover:cursor-pointer"
+              )
                 Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
                 
-    .action-container.flex.flex-col.px-6.pb-6.space-y-2(:class="{'cursor-not-allowed': isInAction}")
+    .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
       Button.bg-slate-700(@click="doAction(false)" :disabled="isInAction" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
         | Print

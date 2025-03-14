@@ -43,7 +43,7 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/language-plugin-pug": "^2.2.0",
-    "@vueuse/core": "^12.3.0",
+    "@vueuse/core": "^13.0.0",
     "autoprefixer": "^10.4.20",
     "compare-versions": "^6.1.1",
     "electron": "^33.2.1",
@@ -91,7 +91,7 @@
     "jimp": "^1.6.0",
     "lodash": "^4.17.21",
     "lowdb": "^7.0.1",
-    "lucide-vue-next": "^0.469.0",
+    "lucide-vue-next": "^0.479.0",
     "mime": "^4.0.6",
     "moment": "^2.30.1",
     "morgan": "^1.10.0",
@@ -102,11 +102,13 @@
     "pdfkit": "^0.16.0",
     "pug": "^3.0.3",
     "radix-vue": "^1.9.12",
+    "reka-ui": "^2.0.2",
     "sharp": "^0.33.5",
-    "tailwind-merge": "^2.6.0",
+    "tailwind-merge": "^3.0.2",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.0.4",
     "vee-validate": "^4.15.0",
     "vue-sonner": "^1.3.0"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

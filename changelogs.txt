@@ -9,8 +9,9 @@
   * print to pdf is not working will the styles - undone
   * image is not removing
   * page scaling at center working now
+  * hide gap field if grid layout selected to 1 in photoSheet maker
 * Added 
-  1. Skeleton for photosheet page in photoSheet Maker - undone
+  1. Skeleton for photosheet page in photoSheet Maker
   2. Custom Front and Back card in CardMaker - undone
   3. re arrage the images in photoSheet maker - undone
 

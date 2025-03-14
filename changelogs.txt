@@ -5,15 +5,15 @@
   * on local ip wait for the 10 second to next move
   * scaling working now
   * to be fixed for re-selecting same image in photosheet maker
-  * dupclicating the image to the null objects
-  * print to pdf is not working will the styles - undone
+  * duplicating the image to the null objects
+  * print to pdf is not working will the styles
   * image is not removing
   * page scaling at center working now
   * hide gap field if grid layout selected to 1 in photoSheet maker
 * Added 
   1. Skeleton for photosheet page in photoSheet Maker
   2. Custom Front and Back card in CardMaker - undone
-  3. re arrage the images in photoSheet maker - undone
+  3. re arrange the images in photoSheet maker - undone
 
 1.0.7
 * Added

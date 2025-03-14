@@ -1,6 +1,6 @@
 import express from "express";
 import cors from 'cors'
-import { join, extname } from "path";
+import { join, extname, parse } from "path";
 import logger from "morgan";
 import bodyParser from "body-parser";
 import http from "http";
@@ -19,6 +19,7 @@ import axios, { AxiosResponse } from 'axios'
 import fileUpload from 'express-fileupload'
 import { v7 as uuidv7 } from 'uuid';
 import { app, BrowserWindow } from 'electron'
+
 
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
@@ -411,6 +412,7 @@ class expressAppClass {
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
 
     // console.log('uploaded file : ', req?.files)
+    console.log('body : ', req?.body)
 
     let sampleFile = {} as UploadedFile;
     let uploadPath;
@@ -422,11 +424,13 @@ class expressAppClass {
     // @ts-ignore
     sampleFile = req.files.sampleFile as UploadedFile;
     let newFileName: string = uuidv7() + extname(sampleFile.name)
+
     uploadPath = expressAppClass.dir[1] + newFileName;
 
     if (req.body?.temp == 'true') {
       uploadPath = expressAppClass.dir[3] + newFileName;
     }
+
 
     // Use the mv() method to place the file somewhere on your server
     sampleFile.mv(uploadPath, function (err) {
@@ -458,12 +462,23 @@ class expressAppClass {
 
       console.log('File uploaded!', o);
 
-      if (req.body?.cardMaker) {
+      if (req.body?.cardMaker == 'true') {
 
         let cardData: cardMakerPDF = o as cardMakerPDF
         cardData.cardType = req.body?.cardType
         cardData.id = req.body?.id
         cardData.password = req.body?.password
+
+        if (req.body?.cardType == 'custom') {
+          if (req.body?.cardFront == 'true') {
+            cardData.cardFront = cardData.filename
+          }
+          if (req.body?.cardBack == 'true') {
+            cardData.cardBack = cardData.filename
+          }
+        }
+
+        console.log('cardData', cardData)
 
         if (req.body?.makerID) {
 
@@ -476,6 +491,9 @@ class expressAppClass {
 
           if (card?.pdfs && card.pdfs.length) {
             let index = req.body?.index || card.pdfs.length
+            if (card.pdfs[index]?.cardType == 'custom') {
+              cardData = { ...card.pdfs[index], ...cardData }
+            }
             card.pdfs[index] = cardData
           } else {
             card.pdfs = [cardData]

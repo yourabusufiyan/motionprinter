@@ -21,7 +21,7 @@ import {
 import PhotoItem from './PhotoItem.vue'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
@@ -156,7 +156,7 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
     if (nextFilled > 0) {
       for (let k = i + 1; k <= nextFilled; k++) {
         if (k == nextFilled) {
-          console.log("no null between next filled, replacinv with splice")
+          console.log("no null between next filled, replacing with splice")
           arr.splice(i, 0, arr[i])
           break;
         }
@@ -173,7 +173,7 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
       arr.splice(totalGrid)
     }
 
-    console.log('final arra length: ', arr.length)
+    console.log('final arr length: ', arr.length)
 
   } else if (!copy) {
     selectedCellIndex.value = index

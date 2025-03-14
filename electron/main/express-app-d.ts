@@ -56,7 +56,7 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   cardBoth?: string | null,
   cardFront?: string | null,
   cardBack?: string | null,
-  cardType: "eshram" | "abha" | "aadhaar" | "ayushman" | null,
+  cardType: "eshram" | "abha" | "aadhaar" | "ayushman" | "custom" | null,
   password?: string | null,
   errorMessage?: string | null,
   warningMessage?: string | null,

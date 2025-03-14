@@ -235,7 +235,7 @@ ipcMain.on('download-file', async (event, file) => {
 });
 
 async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     let opts = {
       format: 'png',
       scale: 3_508,
@@ -486,8 +486,20 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             event.reply('cardMaker-failure', { page, card });
           });
 
-      }
+      } else if (card?.cardType == 'custom') {
 
+        // @ts-ignore
+        page.pdfs[i] = card;
+        event.reply('cardMaker-success', page);
+        console.log("pdf2image cardMaker-success:", card.originalName);
+
+        await sleep(500)
+        card.isCropped = true;
+        event.reply('cardMaker-image-extracted-success', page);
+        console.log("cardMaker-image-extracted-success");
+
+
+      }
 
     })
   }

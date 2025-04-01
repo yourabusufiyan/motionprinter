@@ -46,7 +46,7 @@ const isDataToProcess = ref(false);
 const isChangedAfterCreatingPDF = ref(false);
 
 const options = ref([
-  { label: "Custom", value: "custom" },
+  { label: "Custom Card", value: "custom" },
   { label: "E-Shram", value: "eshram" },
   { label: "Abha", value: "abha" },
   { label: "Aadhaar", value: "aadhaar" },
@@ -404,7 +404,7 @@ const onMakeNewPDF = async () => {
       | #[FileText.px-1.-ml-1] Create PDF
     Button(
       @click="onDownload"
-      :disabled="!page?.outputFile"
+      v-if="page?.outputFile"
       variant="outline"
       class="bg-green-400 text-white"
     ) #[Download.px-1.-ml-1] Download PDF

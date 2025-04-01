@@ -11,6 +11,7 @@
     output: 'release/${version}',
   },
   files: ['dist-electron', 'dist'],
+  asarUnpack: ['dist/assets/*.css'],
   win: {
     target: 'nsis',
     icon: 'public/favicon.ico',

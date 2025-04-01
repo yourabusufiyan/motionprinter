@@ -25,6 +25,8 @@ process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
   ? path.join(process.env.DIST_ELECTRON, '../public')
   : process.env.DIST;
 
+const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
+
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) app.disableHardwareAcceleration();
 
@@ -62,6 +64,12 @@ app.setLoginItemSettings({
   openAtLogin: true,
   args: ['--hidden']
 });
+
+// Global settings for dev and production
+if (!process.env.VITE_DEV_SERVER_URL) {
+  // For production
+  Menu.setApplicationMenu(null)
+}
 
 
 async function createWindow() {
@@ -104,15 +112,11 @@ async function createWindow() {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show App',
-      click: () => {
-        win?.show();
-      },
+      click: () => win?.show(),
     },
     {
-      label: 'Quit',
-      click: () => {
-        app.quit();
-      },
+      label: 'Close App',
+      click: () => app.quit(),
     },
   ]);
   tray.setToolTip('MotionPrinter');
@@ -528,12 +532,10 @@ ipcMain.on("printFile", async (event, file: any) => {
 })
 
 
-ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: boolean, printPDF?: boolean, filename?: string, }) => {
-
-  console.log('generate-pdf')
+ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, head: string, isPrint?: boolean, printPDF?: boolean, filename?: string }) => {
 
   const win = new BrowserWindow({
-    show: false,
+    show: isDev,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -542,11 +544,42 @@ ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: b
 
   try {
 
-    await win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(obj.htmlContent)}`);
+    let cssFiles: string[] = []
+
+    if (!isDev) {
+      console.log("Running in production mode");
+      const cssDir = path.join(process.resourcesPath, 'app.asar.unpacked/dist/assets');
+      const files = fs.readdirSync(cssDir);
+
+      // Read all .css files
+      cssFiles = files
+        .filter(file => file.endsWith('.css'))
+        .map(file => fs.readFileSync(path.join(cssDir, file), 'utf8'));
+
+    }
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        ${cssFiles.map((el, i) => `<style type="text/css" id="inserted-${i}">${el}</style>`).join('\n')}
+        ${obj.head}
+      </head>
+      <body>
+        ${obj.htmlContent}
+      </body>
+    </html>
+  `;
+
+    await win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`);
+
+    await sleep(500);
+
 
     if (obj?.printPDF) {
       console.log('Printing to PDF...')
       const pdfOptions = {
+        color: true,
         margins: {
           marginType: 'printableArea' as "printableArea", // 'none', 'printableArea', or custom
           top: 0,
@@ -601,4 +634,17 @@ ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, isPrint?: b
     console.error(error)
   }
 
+});
+
+const fsPromise = require('fs').promises;
+ipcMain.handle('read-css-file', async (event, fileUrl) => {
+  try {
+    // Convert file:// URL to filesystem path
+    const filePath = fileUrl.replace('file://', '');
+    // Read the CSS file from app.asar
+    const content = await fsPromise.readFile(filePath, 'utf-8');
+    return content;
+  } catch (error: any) {
+    throw new Error(`Failed to read CSS file: ${error.message}`);
+  }
 });

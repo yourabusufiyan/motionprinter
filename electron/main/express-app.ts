@@ -521,7 +521,6 @@ class expressAppClass {
         res.json(o);
       }
 
-
       expressAppClass.db.write()
       expressAppClass.win?.webContents.send('reloadDatabase')
       return;

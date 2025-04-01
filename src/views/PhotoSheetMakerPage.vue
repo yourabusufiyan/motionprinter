@@ -43,9 +43,12 @@ const pages = ref<$photoSheet[]>([{ id: '', photos: [] }])
 const currentPageIndex = ref(0)
 const selectedGrid = ref('6x7')
 const selectedPaperSize = ref('a4')
+const pageMargin = ref(5)
 const cellWidth = ref(50)
 const cellHeight = ref(50)
 const cellGap = ref(5)
+const cellBorder = ref(1)
+const cellBorderColor = ref("rgb(0, 0, 0)")
 const paperZoom = ref(1)
 const isRotating = ref(false)
 const rotationStartAngle = ref(0)
@@ -83,7 +86,12 @@ const gridCells = computed(() => {
   return gridCellsFunc(selectedGrid.value)
 })
 const gridStyle = computed(() => {
-  return gridStyleFunc(selectedGrid.value, cellGap.value.toString() + 'mm')
+  return {
+    ...gridStyleFunc(selectedGrid.value, cellGap.value.toString() + 'mm'),
+    ...{
+      padding: `${pageMargin.value}mm`,
+    }
+  }
 });
 const paperStyle = computed(() => ({
   transform: `scale(${paperZoom.value})`,
@@ -100,6 +108,7 @@ function gridCellsFunc(val: string) {
   const [cols, rows] = val.split('x').map(Number)
   return cols * rows
 }
+
 function gridStyleFunc(val: string, gap: string = '5mm') {
   const [cols, rows] = val.split('x');
   const isCustom = val === 'custom';
@@ -123,23 +132,17 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
   e.stopPropagation()
   if (copy && e.altKey && currentPage.value.photos[index]) {
 
-    console.log('selected cell ', currentPage.value.photos[index], currentPage.value.photos.length)
-    // currentPage.value.photos.splice(index + 1, 0, { ...currentPage.value.photos[index] })
-
     let arr = currentPage.value.photos;
     let totalGrid = gridCells.value;
     let i = index;
 
-    if (totalGrid == (i + 1)) {
-      console.log('no next to copy')
-      return;
-    }
+    if (totalGrid == (i + 1)) return;
+
 
     let nextFilled = -1;
     for (let j = i + 1; j <= totalGrid; j++) {
       if (arr[j] && nextFilled < 0 && arr[i]?.id != arr[j]?.id) {
-        nextFilled = j
-        console.log('Next Filled value is  : ', j)
+        nextFilled = j;
         break;
       }
       if (j >= arr.length) {
@@ -151,29 +154,22 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
         }
       }
     }
-    console.log('nextFilled', nextFilled)
 
     if (nextFilled > 0) {
       for (let k = i + 1; k <= nextFilled; k++) {
         if (k == nextFilled) {
-          console.log("no null between next filled, replacing with splice")
           arr.splice(i, 0, arr[i])
           break;
         }
 
         if (!arr[k]) {
-          console.log('copied to ', k)
           arr.splice(k, 1, arr[i])
           break;
         }
       }
     }
 
-    if (arr.length > totalGrid) {
-      arr.splice(totalGrid)
-    }
-
-    console.log('final arr length: ', arr.length)
+    if (arr.length > totalGrid) arr.splice(totalGrid);
 
   } else if (!copy) {
     selectedCellIndex.value = index
@@ -204,6 +200,10 @@ const findNextEmptyCell = (startIndex: number) => {
 
 const removePhoto = (pageIndex: number, photoIndex: number) => {
   currentPage.value.photos.splice(photoIndex, 1)
+}
+
+const removeEmptyCell = () => {
+  currentPage.value.photos = Object.values(currentPage.value.photos)
 }
 
 const handleFileSelect = async (e: Event) => {
@@ -299,39 +299,31 @@ const updateDimensions = () => {
 };
 
 
-const doAction = (printPDF: boolean = false) => {
+const doAction = async (printPDF: boolean = false) => {
 
   if (!pdfContent.value) {
     console.error('Element not found', pdfContent.value);
     return;
   };
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>MP Photosheet - ${currentPage.value.id}</title>
-        ${Array.from(document.querySelectorAll('style')).map(element => element.outerHTML).join('')}
-        <style>
-          @media print {
-            body { margin, padding, border: 0; }
-          }
-          .grid-cell.cell-empty {
-            visibility: hidden;
-          }
-          .cell-placeholder, .cell-controls {
-            display: none !important;
-          }
-          .grid-container.text-center {
-            width: 210mm;
-            height: 297mm;
-          }
-        </style>
-      </head>
-      <body>
-        ${pdfContent.value.innerHTML}
-      </body>
-    </html>
+  const head = `
+    <title>MP Photosheet - ${currentPage.value.id}</title>
+    ${Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('\n')}
+    <style>
+      @media print {
+        body { margin, padding, border: 0; }
+      }
+      .grid-cell.cell-empty {
+        visibility: hidden;
+      }
+      .cell-placeholder, .cell-controls {
+        display: none !important;
+      }
+      .grid-container.text-center {
+        width: 210mm;
+        height: 297mm;
+      }
+    </style>
   `;
 
   console.log('printPDF', printPDF);
@@ -340,7 +332,8 @@ const doAction = (printPDF: boolean = false) => {
   isPrinting.value = !printPDF
 
   let obj = {
-    htmlContent,
+    head,
+    htmlContent: pdfContent.value.innerHTML,
     printPDF: printPDF,
     isPrint: !printPDF,
     filename: `mp-photosheet-${currentPage.value.id}.pdf`,
@@ -352,6 +345,10 @@ const doAction = (printPDF: boolean = false) => {
 
 
 onMounted(() => {
+
+  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML)
+  console.log('all style tag in head ', styles);
+
   updateDimensions();
   resizeObserver = new ResizeObserver(updateDimensions);
   if (CellRefs.value.length > 0 && CellRefs.value[0]) {
@@ -375,7 +372,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   .scroll-container.left-container.flex-1.bg-blue-200
     .paper-container.flex.justify-center.items-center
       .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle" ref="pdfContent" @wheel="handlePaperZoom")
-        .grid-container.text-center( :style="gridStyle")
+        .grid-container.text-center( :style="[gridStyle]")
           .grid-cell(
             v-for="(cell, index) in gridCells"
             :key="index"
@@ -383,6 +380,9 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
             :ref="(el) => setCellRef(el, index)"
             :class=`{
               "cell-empty": !currentPage.photos[index]
+            }`
+            :style=`{
+              border: cellBorder?.toString() + "px solid " + cellBorderColor?.toString()
             }`
           )
             PhotoItem(
@@ -405,9 +405,10 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
     )
     pre.hidden {{ currentPage}}
   .scroll-container.right-container.w-52.border-l.flex.flex-col.space-y-4
-    .info.px-6.pt-4
-      p {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
-      p {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
+    .info.px-6.pt-2
+      p.text-sm Photo Size : 
+      p.font-sm.hidden {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
+      p.text-sm {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
     ScrollArea.flex-1.px-6.shadow-inner.shadow-sm.border-y
       Accordion(:default-value="defaultAccordion" type="multiple")
         AccordionItem(value="options")
@@ -423,27 +424,20 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 SelectContent
                   SelectItem(v-for="(_, index) in pages" :value="index") Page {{ index + 1 }}
 
-            Select.max-w-full(v-model="selectedPaperSize")
-              SelectTrigger.w-48
-                SelectValue(placeholder="Paper Size")
-              SelectContent
-                SelectGroup
-                  SelectLabel Paper Sizes
-                  SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
-            
+            div
+              Select.w-full(v-model="selectedPaperSize")
+                SelectTrigger
+                  SelectValue(placeholder="Paper Size")
+                SelectContent
+                  SelectGroup
+                    SelectLabel Paper Sizes
+                    SelectItem(v-for="size in paperSizes" :value="size.value") {{ size.name }}
+
             div
               Label Grid Layouts
               select.mt-1.p-1.w-full(v-model="selectedGrid")
                 option Grid Layouts
                 option(v-for="layout in gridLayouts" :value="layout.value") {{ layout.label }}
-            
-
-            NumberField#gap(v-model="cellGap" v-if="selectedGrid != '1x1'" :min="0" :max="20")
-              Label(for="gap") Gap
-              NumberFieldContent
-                NumberFieldDecrement
-                NumberFieldInput
-                NumberFieldIncrement
 
             NumberField#cellWidth(v-model="cellWidth" v-if="selectedGrid.value === 'custom'" :min="10" :max="500")
               Label(for="cellWidth") Cell Width (mm):
@@ -459,11 +453,41 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 NumberFieldInput
                 NumberFieldIncrement
 
+            NumberField#pageMargin(v-model="pageMargin" :min="0" :max="20")
+              Label(for="pageMargin") Margin
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
+
+            NumberField#gap(v-model="cellGap" v-if="selectedGrid != '1x1'" :min="0" :max="20")
+              Label(for="gap") Gap
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
+            
+            NumberField#cellBorder(v-model="cellBorder" :min="0" :max="20")
+              Label(for="cellBorder") Stroke
+              NumberFieldContent
+                NumberFieldDecrement
+                NumberFieldInput
+                NumberFieldIncrement
+
+            .color-picker.grid(class="gap-1.5")
+              Label.block(for="cellBorderColor") Stroke Color
+              .color-picker-container
+                color-picker(
+                  lang="En"
+                  v-model:pureColor="cellBorderColor"
+                )
+            Button(@click="removeEmptyCell()") Remove Empty Cell
+
         AccordionItem(value="grids")
           AccordionTrigger.text-lg Layouts
           AccordionContent.bg-gray-50.py-4
-            .space-y-3.mx-4.bg-white.shadow-sm( :style="{ aspectRatio: '210/297' }")
-              .grid-container.text-center.w-full.border.border-2.p-1(
+            .space-y-4.mx-6.shadow-sm( :style="{ aspectRatio: '210/297' }")
+              .grid-container.bg-white.text-center.w-full.border.border-2.p-1(
                 v-for="layout in gridLayouts"
                 @click.prevent="selectedGrid = layout.value"
                 :class=`{"border-slate-500" : selectedGrid == layout.value}`
@@ -472,13 +496,15 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
               )
                 Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
                 
+
     .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
-      Button.bg-slate-700(@click="doAction(false)" :disabled="isInAction" ) 
+      Button.hidden.bg-slate-700(@click="doAction(false)" :disabled="isInAction || !currentPage?.photos?.length" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
         | Print
-      Button(@click="doAction(true)" variant="outline" :disabled="isInAction") 
+      Button(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length") 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPdfDownloading")
         | Download PDF
+pre {{currentPage}}
 </template>
 
 <style lang="stylus" scoped>
@@ -514,7 +540,6 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   display grid
   height 100%
   gap 2mm
-  padding 5mm
 
 .grid-cell 
   position relative
@@ -530,4 +555,9 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   height 100%
   color #666
   cursor pointer
+
+.color-picker-container ::v-deep(.vc-color-wrap) 
+  width 100%
+  height 36px
+  @apply rounded-md 
 </style>

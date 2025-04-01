@@ -6,6 +6,9 @@ import App from './App.vue';
 import './samples/node-api';
 import router from './router/router';
 
+import Vue3ColorPicker from "vue3-colorpicker";
+import "vue3-colorpicker/style.css";
+
 const app = createApp(App);
 
 const messages = Object.fromEntries(
@@ -30,6 +33,7 @@ app.use(
 );
 app.use(createPinia());
 app.use(router);
+app.use(Vue3ColorPicker);
 
 app.mount('#app').$nextTick(() => {
   postMessage({ payload: 'removeLoading' }, '*');

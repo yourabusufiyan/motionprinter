@@ -1,7 +1,47 @@
+1.1.0
+* Fixed
+  1. Auto closed sumantra after selecting printer
+  2. PDF password auto deleting removed
+  3. Improved speed of processing of Aadhaar Card
+
+1.0.9
+* Fixed
+  1. Photo layout is not working in production in photosheet maker
+  2. Incorrect password in AADHAAR card solved
+
+* Improvements
+  1. Fix bug in Custom Front and Back card in CardMaker
+
+* Added 
+  1. photo border stroke and stroke color on photosheet maker 
+  2. Margin in photosheet maker
+  3. Button: Removed Empty Cell in PhotoSheet Maker
+
+1.0.8
+* Improvements
+  * get computerName on app start
+  * detected ip change and reload app
+  * on local ip wait for the 10 second to next move
+  * scaling working now
+  * to be fixed for re-selecting same image in photosheet maker
+  * duplicating the image to the null objects
+  * print to pdf is not working will the styles
+  * image is not removing
+  * page scaling at center working now
+  * hide gap field if grid layout selected to 1 in photoSheet maker
+* Added 
+  1. Skeleton for photosheet page in photoSheet Maker
+  2. Custom Front and Back card in CardMaker
+
+1.0.7
+* Added
+    1. Photo Sheet Maker
+
 1.0.6
 * bugs
   1. CardMaker
     (i) AADHAAR CARD auto cropped fix
+    (ii) Ayushman card
 
 1.0.5
 * Added

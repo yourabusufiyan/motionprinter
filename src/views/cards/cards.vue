@@ -14,6 +14,7 @@ import { shell } from 'electron';
 import type { $cardMaker, $cardMakerPDF } from '@/declarations/index'
 
 // Components
+import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -24,7 +25,7 @@ import { Loader2, RotateCcw, FileText, Download, Plus, Trash2, IdCard, Printer }
 
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | 'abha' | 'aadhaar' | null;
+  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | null;
   file: File | null;
   password?: string;
   message?: string;
@@ -42,13 +43,20 @@ const messageWarning = ref('');
 const messageWarningFile = ref('');
 const isProcessing = ref(false);
 const isDataToProcess = ref(false);
+const isChangedAfterCreatingPDF = ref(false);
 
 const options = ref([
+  { label: "Custom Card", value: "custom" },
   { label: "E-Shram", value: "eshram" },
   { label: "Abha", value: "abha" },
   { label: "Aadhaar", value: "aadhaar" },
   { label: "Ayushman", value: "ayushman" },
-].sort((a, b) => a.label.localeCompare(b.label)));
+].sort((a, b) => {
+  if (b.value == 'custom') return 1;
+  return a.label.localeCompare(b.label)
+}));
+
+
 
 function createNewRepeaterItem(): RepeaterItem {
   return {
@@ -60,6 +68,7 @@ function createNewRepeaterItem(): RepeaterItem {
 
 function saveToMain() {
   console.log(lordStore.lowdb.data)
+  isChangedAfterCreatingPDF.value = true;
   let data = lordStore.db.cardMaker.map((el: $cardMaker, i: number) => {
     if (el.id === page.value?.id) {
       if (page.value?.pdfs) {
@@ -83,10 +92,8 @@ const removeRepeaterField = (index: number) => {
   saveToMain();
 };
 const handlePasswordChange = async (event: Event, index: number, card: $cardMakerPDF) => {
-  console.log('password chnge', page.value?.pdfs?.length, page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id), card)
   if (page.value?.pdfs?.length && page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)) {
     page.value.pdfs[index].password = toString(repeater.value[index].password);
-    console.log('password sentttttt', page.value)
     message.value = 'Card processing in high quality. Please wait...'
     isProcessing.value = true;
     ipcRenderer.send('cardMaker', cloneDeep(page.value));
@@ -117,10 +124,21 @@ const handleFileUpload = async (event: Event, index: number) => {
   formData.append("cardType", repeater.value[index].cardType?.toString() || '');
   formData.append("id", repeater.value[index].id.toString());
   formData.append("password", repeater.value[index]?.password?.toString() || '');
+  formData.append("addedBy", lordStore.db.computerName || '');
+
+  if (repeater.value[index].cardType?.toString() == 'custom') {
+    if (target.id == 'card-front') {
+      formData.append("cardFront", 'true');
+    } else if (target.id == 'card-back') {
+      formData.append("cardBack", "true");
+    }
+  }
 
   if (page.value?.id) {
     formData.append("makerID", page.value.id);
   }
+
+  console.log('goin to make a upload request')
 
   try {
     const response = await axios.post(
@@ -129,6 +147,8 @@ const handleFileUpload = async (event: Event, index: number) => {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     message.value = "File uploaded successfully!";
+
+    console.log(response.data)
 
     if (response?.data?.pdfs?.length && !isEqual(page.value, response.data)) {
       message.value = 'Card processing. Please wait...'
@@ -142,7 +162,9 @@ const handleFileUpload = async (event: Event, index: number) => {
       let temp = cloneDeep(response.data?.pdfs)
       page.value.pdfs = []
       repeater.value.filter((el, i) => {
-        page.value.pdfs.push(find(temp, ['id', el.id]))
+        if (page.value?.pdfs?.length) {
+          page.value.pdfs.push(find(temp, ['id', el.id]))
+        }
       })
 
     }
@@ -160,7 +182,6 @@ const handleFileUpload = async (event: Event, index: number) => {
 
 const resetFields = () => {
   repeater.value = [createNewRepeaterItem()];
-  page.value = null
   message.value = ''
   messageFile.value = ''
   messageWarning.value = ''
@@ -190,13 +211,13 @@ const ipcHandlers = {
     messageFile.value = card.originalName || '';
     isProcessing.value = false;
   },
-  'cardMaker-image-extracted-success': (event: IpcRendererEvent, file: $cardMaker) => {
+  'cardMaker-image-extracted-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `Image extracted successfully`;
-    page.value = merge(page.value, file);;
+    page.value = merge(page.value, returnPage);;
     saveToMain()
-    console.log(file)
+    console.log(returnPage)
 
-    const warning = file.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
+    const warning = returnPage.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
     if (warning) {
       messageWarning.value = warning.warningMessage || '';
       messageWarningFile.value = warning.originalName || '';
@@ -261,12 +282,24 @@ const onCreate = () => {
     message.value = "Please wait while creating PDF...";
     messageFile.value = ''
     isProcessing.value = true;
+    isDataToProcess.value = false;
     ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value));
   }
 };
 
 const onPrint = async () => {
-  shell.openPath(page.value?.outputFile);
+  ipcRenderer.send('printFile', { path: page.value?.outputFile?.toString(), options: { printDialog: true } })
+};
+
+const onMakeNewPDF = async () => {
+  repeater.value = [createNewRepeaterItem()];
+  page.value = null
+  message.value = ''
+  messageFile.value = ''
+  messageWarning.value = ''
+  messageWarningFile.value = ''
+  isProcessing.value = false
+  isDataToProcess.value = false
 };
 
 
@@ -288,13 +321,14 @@ const onPrint = async () => {
       strong Warning! "{{ messageWarningFile }}"
       p {{ messageWarning }}
 
-    div(
+    .flex.flex-wrap.gap-2.items-center.border.p-3.rounded-lg.shadow-sm.space-y-4.space-x-4(
       v-for="(field, index) in repeater"
       :key="field.id"
-      class="flex flex-wrap gap-2 items-center border p-3 rounded-lg shadow-sm"
+      class=""
     )
-      .select-container.w-40
-        Select(@update:modelValue="(value: string) => onSelectChange(value, index)")
+      .select-container.w-40.place-self-end
+        Label.mb-1(for="cardType") Card Type 
+        Select#cardType(@update:modelValue="(value: string) => onSelectChange(value, index)")
           SelectTrigger.p-5
             SelectValue(placeholder="Select the Card")
           SelectContent
@@ -304,7 +338,7 @@ const onPrint = async () => {
               :value="option.value"
             ) {{ option.label }}
 
-      .password-container.w-40(v-if="field.cardType === 'aadhaar'")
+      .password-container.w-40.place-self-end(v-if="field.cardType === 'aadhaar'")
         Input(
           v-model="field.password"
           @change="(e: Event) => handlePasswordChange(e, index, field)"
@@ -312,11 +346,14 @@ const onPrint = async () => {
           class="border rounded-lg text-sm w-full"
         )
 
-      .grid.w-full.max-w-sm.items-center(
+      
+      .grid.w-full.max-w-sm.items-center.place-self-end(
         class="gap-1.5"
         :class="{ 'hover:cursor-not-allowed': !field.cardType }"
-      )
-        Input(
+        v-if="field.cardType != 'custom'"
+      )  
+        Label(for="card-pdf") Card's PDF
+        Input#card-pdf(
           :disabled="!field.cardType"
           :key="field.cardType"
           @change="(e: Event) => handleFileUpload(e, index)"
@@ -325,7 +362,36 @@ const onPrint = async () => {
           class="border rounded-lg text-sm m-0 p-0 sm:w-full sm:max-w-full"
         )
 
-      Button(
+      .grid.w-full.max-w-sm.items-center.place-self-end(
+        class="gap-1.5"
+        :class="{ 'hover:cursor-not-allowed': !field.cardType }"
+        v-if="field.cardType === 'custom'"
+      )  
+        Label(for="card-front") Card Front
+        Input#card-front(
+          :disabled="!field.cardType"
+          :key="field.cardType"
+          @change="(e: Event) => handleFileUpload(e, index)"
+          type="file"
+          accept="image/*"
+          class="border rounded-lg text-sm m-0 p-0 sm:w-full sm:max-w-full"
+        )
+
+      .grid.w-full.max-w-sm.items-center.place-self-end(
+        class="gap-1.5"
+        v-if="field.cardType === 'custom'"
+      )  
+        Label(for="card-back") Card Back 
+        Input#card-back(
+          :disabled="!field.cardType"
+          :key="field.cardType"
+          @change="(e: Event) => handleFileUpload(e, index)"
+          type="file"
+          accept="image/*"
+          class="border rounded-lg text-sm m-0 p-0 sm:w-full sm:max-w-full"
+        )
+
+      Button.place-self-end(
         @click="removeRepeaterField(index)"
         variant="destructive"
       ) #[Trash2.py-1] Remove
@@ -338,7 +404,7 @@ const onPrint = async () => {
       | #[FileText.px-1.-ml-1] Create PDF
     Button(
       @click="onDownload"
-      :disabled="!page?.outputFile"
+      v-if="page?.outputFile"
       variant="outline"
       class="bg-green-400 text-white"
     ) #[Download.px-1.-ml-1] Download PDF
@@ -348,13 +414,18 @@ const onPrint = async () => {
       variant="outline"
       class="bg-slate-600 text-white"
     ) #[Printer.py-1.-ml-1] Print 
+    Button(
+      @click="onMakeNewPDF()"
+      v-if="page?.outputFile"
+      variant="outline"
+      class="bg-blue-600 text-white"
+    ) #[Printer.py-1.-ml-1] New PDF
 
-  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs")
+  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF
-
     .card-container
-      .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs?.filter(isObject)" :key="card.id")
-        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
+      .flex.items-center.justify-center.gap-4(v-for="card in page?.pdfs?.filter(isObject)" :key="card.id")
+        .card-front.flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
           img(
             v-if="card?.cardFront"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardFront}`"
@@ -370,7 +441,7 @@ const onPrint = async () => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
-        .flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
+        .card-back.flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
           img(
             v-if="card?.cardBack"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardBack}`"
@@ -387,3 +458,10 @@ const onPrint = async () => {
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
 </template>
+
+<style lang="stylus" scoped>
+.card-container 
+  & .card-front > .w-full, & .card-back > .w-full {
+    aspect-ratio: 1011/638;
+  } 
+</style>

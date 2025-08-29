@@ -20,6 +20,7 @@ export type uploadFile = {
   filename: string,
   path: string,
   size: number,
+  temp?: boolean,
 }
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -55,7 +56,7 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   cardBoth?: string | null,
   cardFront?: string | null,
   cardBack?: string | null,
-  cardType: "eshram" | "abha" | "aadhaar" | "ayushman" | null,
+  cardType: "eshram" | "abha" | "aadhaar" | "ayushman" | "custom" | null,
   password?: string | null,
   errorMessage?: string | null,
   warningMessage?: string | null,
@@ -67,4 +68,23 @@ export type cardMaker = {
   path?: string | null,
   outputFile?: string | null,
   pdfs?: cardMakerPDF[],
+}
+
+export type Photo = {
+  src?: string,
+  zoom?: number,
+  rotation?: number,
+  position?: { x: number; y: number },
+  width?: number,
+  height?: number,
+}
+
+export type photoSheetPhoto = uploadFile & Photo
+
+export type photoSheet = {
+  id: string,
+  filename?: string,
+  path?: string | null,
+  outputFile?: string | null,
+  photos: photoSheetPhoto[],
 }

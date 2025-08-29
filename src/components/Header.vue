@@ -16,7 +16,7 @@ header.header.bg-slate-100.border-b.shadow-sm.shadow-slate-900(
   .container.py-4.flex.items-center.justify-between
     h2.text-lg {{ route.meta.title }}
     button(@click="toggleDark()")
-      span.ml-2.transition-all 
+      span.ml-2.transition-all.inline-block
         <SunIcon v-if="isDark" />
         <MoonIcon v-else />
 </template>

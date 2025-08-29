@@ -1,6 +1,6 @@
 import express from "express";
 import cors from 'cors'
-import { join, extname } from "path";
+import { join, extname, parse } from "path";
 import logger from "morgan";
 import bodyParser from "body-parser";
 import http from "http";
@@ -20,6 +20,7 @@ import fileUpload from 'express-fileupload'
 import { v7 as uuidv7 } from 'uuid';
 import { app, BrowserWindow } from 'electron'
 
+
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
 import type { lordData, connectedPC, computerProfile } from './../../src/declarations/LordStore.d';
@@ -33,7 +34,6 @@ import { ip_to_sequence, sleep } from '../../helpers/both'
 import dayjs from 'dayjs'
 
 
-
 class expressAppClass {
 
   static app = express()
@@ -45,7 +45,8 @@ class expressAppClass {
   static dir = [
     join(os.homedir(), app.getName(), "./public/"),
     join(os.homedir(), app.getName(), "./upload/"),
-    join(os.homedir(), app.getName(), "./db/")
+    join(os.homedir(), app.getName(), "./db/"),
+    join(os.homedir(), app.getName(), "./temp/")
   ]
 
   static computerName: string | undefined = process.env.COMPUTERNAME
@@ -92,7 +93,8 @@ class expressAppClass {
       recentlyConnectedPCs: [],
       lastCheckConnectedPC: 0,
       offlineComputers: [],
-      cardMaker: []
+      cardMaker: [],
+      temp: []
     };
   }
 
@@ -131,7 +133,7 @@ class expressAppClass {
 
     // if db file does not exist, create it
     this.dir.map(el => (!existsSync(el)) && mkdirSync(el, { recursive: true }))
-    this.db.data = { ...this.defaultLordData(), ...this.db.data }
+    this.db.data = { ...this.defaultLordData(), ...this.db.data, ...pick(this.defaultLordData(), ['computerName']) }
     this.db.write()
 
     this.routesInit()
@@ -174,6 +176,7 @@ class expressAppClass {
     this.app.use(fileUpload())
     this.app.use('/public/', express.static(this.dir[0]));
     this.app.use('/upload/', express.static(this.dir[1]));
+    this.app.use('/temp/', express.static(this.dir[3]));
     this.app.use("/api/v1/", this.router);
     this.app.use((_req: any, _res: any, next: any) => next(createError(404)));
     this.app.use((err: any, req: any, res: any, _next: any) => {
@@ -187,11 +190,21 @@ class expressAppClass {
 
   static intervalInit(): void {
 
-
     setTimeout(async () => {
       while (true) {
 
-        if (this.ip == '127.0.0.1') break;
+        if (ip.address() != this.ip) {
+          console.log('Changed IP, reloading server')
+          app.relaunch({ args: process.argv.slice(1).concat(['--relaunch']) })
+          app.exit(0)
+          break;
+        }
+
+        if (this.ip == '127.0.0.1') {
+          console.log('Local IP, waiting for 10 seconds')
+          this.addresses = ['127.0.0.1']
+          this.isFirstLoop || await sleep(10_000)
+        }
 
         if (this.isFirstLoop) {
           this.db.data.ConnectedPCs = []
@@ -263,8 +276,6 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
-
-        // console.log('onlineAddresses', this.onlineAddresses)
 
         if (!size(this.onlineAddresses)) {
           await sleep(1000)
@@ -400,7 +411,8 @@ class expressAppClass {
 
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
 
-    console.log('uploaded file : ', req?.files)
+    // console.log('uploaded file : ', req?.files)
+    console.log('body : ', req?.body)
 
     let sampleFile = {} as UploadedFile;
     let uploadPath;
@@ -412,7 +424,12 @@ class expressAppClass {
     // @ts-ignore
     sampleFile = req.files.sampleFile as UploadedFile;
     let newFileName: string = uuidv7() + extname(sampleFile.name)
+
     uploadPath = expressAppClass.dir[1] + newFileName;
+
+    if (req.body?.temp == 'true') {
+      uploadPath = expressAppClass.dir[3] + newFileName;
+    }
 
 
     // Use the mv() method to place the file somewhere on your server
@@ -420,9 +437,6 @@ class expressAppClass {
       if (err)
         return res.status(500).send(err);
 
-      console.log('File uploaded!');
-      console.log('req.file', req.file)
-      console.log('req.body', req.body)
 
       const fileData = {} as uploadFile;
 
@@ -433,6 +447,7 @@ class expressAppClass {
       fileData.filename = newFileName
       fileData.path = expressAppClass.dir[1]
       fileData.size = sampleFile.size
+      fileData.temp = req.body?.temp == 'true'
 
       let o: toPrintsCommandsFile = {
         ...fileData, ...{
@@ -445,14 +460,25 @@ class expressAppClass {
         }
       }
 
-      console.log(o)
+      console.log('File uploaded!', o);
 
-      if (req.body?.cardMaker) {
+      if (req.body?.cardMaker == 'true') {
 
         let cardData: cardMakerPDF = o as cardMakerPDF
         cardData.cardType = req.body?.cardType
         cardData.id = req.body?.id
         cardData.password = req.body?.password
+
+        if (req.body?.cardType == 'custom') {
+          if (req.body?.cardFront == 'true') {
+            cardData.cardFront = cardData.filename
+          }
+          if (req.body?.cardBack == 'true') {
+            cardData.cardBack = cardData.filename
+          }
+        }
+
+        console.log('cardData', cardData)
 
         if (req.body?.makerID) {
 
@@ -465,6 +491,9 @@ class expressAppClass {
 
           if (card?.pdfs && card.pdfs.length) {
             let index = req.body?.index || card.pdfs.length
+            if (card.pdfs[index]?.cardType == 'custom') {
+              cardData = { ...card.pdfs[index], ...cardData }
+            }
             card.pdfs[index] = cardData
           } else {
             card.pdfs = [cardData]
@@ -484,10 +513,13 @@ class expressAppClass {
         }
 
       } else {
-        expressAppClass.db.data.toPrintsCommands.push(o)
+        if (req.body?.temp == 'true') {
+          expressAppClass.db.data.temp.push(o)
+        } else {
+          expressAppClass.db.data.toPrintsCommands.push(o)
+        }
         res.json(o);
       }
-
 
       expressAppClass.db.write()
       expressAppClass.win?.webContents.send('reloadDatabase')
@@ -635,6 +667,7 @@ class expressAppClass {
 
       return true;
     })
+
   }
 
 

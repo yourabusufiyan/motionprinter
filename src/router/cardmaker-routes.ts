@@ -2,14 +2,14 @@ import type { RouteRecordRaw } from 'vue-router';
 
 const NestedRoutes: RouteRecordRaw[] = [
   {
-    path: '', // Default child route
+    path: '',
     component: () => import('../views/cards/cards.vue'),
     meta: { title: 'Card Maker' },
   },
   {
-    path: 'eshrem', // Default child route
-    name: 'eshrem',
-    component: () => import('@/views/cards/Eshrem.vue'),
+    path: '/:id',
+    name: 'cardView',
+    component: () => import('@/views/cards/cardView.vue'),
   },
 ];
 

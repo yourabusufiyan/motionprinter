@@ -5,7 +5,7 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
   .ml-64.min-h-screen.flex.flex-col
     Header
     main.flex-1.flex.justify-between.flex-col.bg-white
-      .router-container.container.my-3.flex-1
+      .router-container.flex-1
         <router-view/>
       Footer
 
@@ -68,7 +68,7 @@ if (route.path == '/') {
 onMounted(async () => {
   axios.get('https://api.github.com/repos/yourabusufiyan/motionprinter/releases/latest').then(async (response) => {
     const data = response.data
-    console.log('motionprinter from info.json');
+    console.log('Latest Release: ', data)
     if (compare(toString(data.tag_name.slice(1)), toString(await ipcRenderer.invoke('version')), '>')) {
       console.log('New version available...')
       DownloadLink.value = data.assets[0].browser_download_url;

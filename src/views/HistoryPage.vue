@@ -161,15 +161,6 @@ function onDownload(file: $toPrintsCommandsFile): void {
   }
 }
 
-function toImage(file: $toPrintsCommandsFile): void {
-  console.log("toImage", file)
-  try {
-    ipcRenderer.send('convert-pdf-to-image', file);
-  } catch (error) {
-    error = !error
-    console.error('Error occurred while converting PDF to images:', error);
-  }
-}
 
 
 ipcRenderer.on('download-success', (event, file) => {
@@ -203,7 +194,7 @@ ipcRenderer.on('conversion-error', (event, error) => {
 </script>
 
 <template lang="pug">
-.tasks-view
+.tasks-view.container.w-100.py-8
   .check-files-exits(v-if="lordStore.lowdb.data?.toPrintsCommands?.length")
 
     .table-options(class="dark:text-slate-300", v-if="lordStore.lowdb.data?.toPrintsCommands?.length >= 11")
@@ -348,10 +339,6 @@ ipcRenderer.on('conversion-error', (event, error) => {
                           class="hover:cursor-pointer" 
                           @click.prevent="onDelete(tr)"
                         ) Move to Trash
-                        DropdownMenuItem(
-                          class="hover:cursor-pointer" 
-                          @click.prevent="toImage(tr)"
-                        ) To Image
 
 
     .flex.items-center.justify-between.mt-6

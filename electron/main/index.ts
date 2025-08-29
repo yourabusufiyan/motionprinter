@@ -11,17 +11,21 @@ import { execFile } from 'child_process'
 import { Jimp } from "jimp";
 import { intToRGBA } from "@jimp/utils";
 import { sleep } from '../../helpers/both'
+import { print } from 'pdf-to-printer';
 
 import { isUndefined, last } from 'lodash';
 
 import expressAppClass from './express-app'
 import type { cardMaker, cardMakerPDF } from './express-app-d'
+import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard, extractAadhaarCard } from './../helpers/cardmakers'
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
 process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
   ? path.join(process.env.DIST_ELECTRON, '../public')
   : process.env.DIST;
+
+const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -60,6 +64,12 @@ app.setLoginItemSettings({
   openAtLogin: true,
   args: ['--hidden']
 });
+
+// Global settings for dev and production
+if (!process.env.VITE_DEV_SERVER_URL) {
+  // For production
+  Menu.setApplicationMenu(null)
+}
 
 
 async function createWindow() {
@@ -102,15 +112,11 @@ async function createWindow() {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show App',
-      click: () => {
-        win?.show();
-      },
+      click: () => win?.show(),
     },
     {
       label: 'Quit',
-      click: () => {
-        app.quit();
-      },
+      click: () => app.quit(),
     },
   ]);
   tray.setToolTip('MotionPrinter');
@@ -132,8 +138,6 @@ async function createWindow() {
       event.preventDefault(); // Prevent the window from closing
       win?.hide(); // Hide the window instead
     }
-    // win = null;
-    // expressAppClass.shutdown();
   });
 
   // Quit the app when the tray icon is right-clicked and "Quit" is selected
@@ -158,10 +162,6 @@ async function createWindow() {
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
-  // win = null;
-  // if (process.platform !== 'darwin') app.quit();
-});
 
 app.on('second-instance', () => {
   if (win) {
@@ -198,18 +198,8 @@ ipcMain.handle('open-win', (_, arg) => {
   }
 });
 
-ipcMain.on('ping', () => {
-})
-
-ipcMain.on('reloadDatabase', () => {
-})
 
 ipcMain.handle('version', () => app.getVersion());
-
-ipcMain.on("searchOnlinePCs", (event) => {
-  event.sender.send("eventFromMain", 'someReply');
-})
-
 
 
 // Handle file read and save
@@ -248,6 +238,65 @@ ipcMain.on('download-file', async (event, file) => {
 
 });
 
+async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
+  return new Promise(async (resolve, reject) => {
+
+    console.time('pdf2image');
+
+    let opts = {
+      format: 'png',
+      scale: 3_508,
+      out_dir: path.dirname(file.destination),
+      out_prefix: path.basename(file.destination, path.extname(file.destination)),
+      page: null,
+      args: {}
+    };
+
+    console.log(
+      'opts',
+      file.originalName as string,
+      path.extname(file.originalName as string),
+      path.basename(file.originalName as string),
+      path.basename(file.originalName as string, path.extname(file.originalName as string)).toUpperCase(),
+    )
+
+    opts.args = {
+      'opw': file?.password || path.basename(file.originalName as string, path.extname(file.originalName as string)).toUpperCase()
+    }
+
+    pdf.info(file.destination, opts)
+      .then((pdfinfo: any) => {
+
+        opts.scale = Math.abs(pdfinfo.height_in_pts * (300 / 72))
+
+        if (file.cardType == 'aadhaar') {
+          opts.scale = Math.abs(pdfinfo.width_in_pts * (240 / 72))
+        }
+
+        pdf.convert(file.destination, opts)
+          .then((res: any) => {
+            file.isConverted = true;
+            file.opts = opts;
+            file.cardBoth = `${opts.out_prefix}-1.png`
+            console.log('Successfully converted', opts);
+            resolve(file);
+          })
+          .catch((error: any) => {
+            console.error(error);
+            const errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || "Unknown error";
+            console.log(errorMessage);
+            reject(error);
+          })
+
+
+      })
+      .catch((error: any) => {
+        console.error(error);
+        reject(error);
+      })
+    console.timeEnd('pdf2image');
+  })
+}
 
 ipcMain.on('pdf2image', async (event, file) => {
 
@@ -282,134 +331,11 @@ ipcMain.on('pdf2image', async (event, file) => {
 
 });
 
-import { createA4PDFwithEshremCards, createA4WithImagesPDF } from './../helpers/cardmakers'
-
-ipcMain.on("eshrem", async (event, page: cardMaker) => {
-  let eshremPage = await createA4PDFwithEshremCards(page)
-  console.log('eshremPage', eshremPage)
-  event.reply('eshrem-success', eshremPage);
-})
 
 
-
-async function extractEshramCard(
-  imagePath: string,
-  outputDir: string,
-  prefix = "image",
-  BORDER_COLOR = { r: 204, g: 204, b: 204 }
-) {
-  const COLOR_TOLERANCE = 5; // Allow slight color variations (±5 in RGB values)
-  // Require 80% of pixels in a row/column to be border-colored
-  const MIN_BORDER_LENGTH = 0.5;
-
-  try {
-    const image = await Jimp.read(imagePath);
-    const { width, height } = image.bitmap;
-
-    console.log('assfsdfsddddddddddddddsdddddddddddddddddddddddddddddddds', width, height);
-
-    if (width < 500) {
-
-      console.log('having low imagee auto croppping the image')
-      image.autocrop();
-      image
-        .clone()
-        .crop({ x: 0, y: 0, w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
-        .write(`${outputDir}/${prefix}-front.png`);
-      image
-        .clone()
-        .crop({ x: 0, y: Math.floor(image.bitmap.height / 2), w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
-        .write(`${outputDir}/${prefix}-back.png`);
-
-      return true;
-    } else {
-      // Check if a pixel matches the border color (with tolerance)
-      const isBorderColor = (r: number, g: number, b: number) => {
-        return (
-          Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
-          Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
-          Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE
-        );
-      };
-
-      // Find horizontal borders (rows)
-      const horizontalBorders = [];
-      for (let y = 0; y < height; y++) {
-        let borderPixels = 0;
-        for (let x = 0; x < width; x++) {
-          const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
-          if (isBorderColor(r, g, b)) borderPixels++;
-        }
-        // Check if this row qualifies as a border
-        if (borderPixels / width >= MIN_BORDER_LENGTH) {
-          horizontalBorders.push(y);
-        }
-      }
-
-      // Debug: Log detected horizontal borders
-      console.log("Horizontal borders:", horizontalBorders);
-
-      // Find vertical borders for each region between horizontal borders
-      const regions = [];
-      for (let i = 0; i < horizontalBorders.length - 1; i++) {
-        const yStart = horizontalBorders[i] + 1;
-        const yEnd = horizontalBorders[i + 1] - 1;
-
-        // Find vertical borders in this region
-        const verticalBorders = [];
-        for (let x = 0; x < width; x++) {
-          let borderPixels = 0;
-          for (let y = yStart; y <= yEnd; y++) {
-            const { r, g, b } = intToRGBA(image.getPixelColor(x, y));
-            if (isBorderColor(r, g, b)) borderPixels++;
-          }
-          // Check if this column qualifies as a border
-          if (borderPixels / (yEnd - yStart + 1) >= MIN_BORDER_LENGTH) {
-            verticalBorders.push(x);
-          }
-        }
-
-        // Debug: Log detected vertical borders for this region
-        console.log(
-          `Vertical borders between rows ${yStart}-${yEnd}:`,
-          verticalBorders
-        );
-
-        // Find regions between vertical borders
-        for (let j = 0; j < verticalBorders.length - 1; j++) {
-          const x = verticalBorders[j] + 1;
-          const y = yStart;
-          const w = verticalBorders[j + 1] - x;
-          const h = yEnd - yStart + 1;
-          // Ensure region has valid dimensions
-          if (w > 0 && h > 0) {
-            regions.push({ x, y, w, h });
-          }
-        }
-      }
-
-      // Save regions as images
-      if (regions.length === 0) {
-        console.log("No regions found. Check border detection above.");
-        return false;
-      }
-
-      fs.mkdirSync(outputDir, { recursive: true });
-      regions.forEach((region, index) => {
-        image
-          .clone()
-          .crop(region)
-          .write(`${outputDir}/${prefix}-${index == 0 ? 'front' : 'back'}.png`);
-      });
-      console.log(`Extracted ${regions.length} images!`);
-      return true;
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    return false;
-  }
-}
 ipcMain.on("cardMaker", async (event, page: cardMaker) => {
+
+  console.log(page)
 
   if (!isUndefined(page)) {
     page?.pdfs?.filter(async (card, i) => {
@@ -417,6 +343,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
       if (card?.isConverted) return true;
 
       if (card?.cardType == 'eshram') {
+
         execFile(
           path.join(pdf.path, 'pdfimages'),
           [
@@ -440,6 +367,8 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             event.reply('cardMaker-success', page);
             console.log("cardMaker-success:", card.originalName);
 
+            if (card?.isCropped) return;
+
             let cardName = path.basename(card?.filename, path.extname(card?.filename))
             let imagePath = path.join(card.path, `${cardName}-000.png`)
 
@@ -454,8 +383,10 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
             if (await extractEshramCard(card.cardBoth, card.path, cardName)) {
               card.cardFront = `${cardName}-front.png`
               card.cardBack = `${cardName}-back.png`
-              // @ts-ignore
-              page.pdfs[i] = card;
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
               event.reply('cardMaker-image-extracted-success', page);
               console.log("cardMaker-image-extracted-success");
             } else {
@@ -464,8 +395,131 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
 
           }
         );
-      }
 
+      } else if (card?.cardType == 'abha' || card?.cardType == 'ayushman') {
+
+        pdf2image(card)
+          .then(async (newCard: cardMakerPDF) => {
+
+            // @ts-ignore
+            page.pdfs[i] = card = newCard;
+            event.reply('cardMaker-success', page);
+            console.log("pdf2image cardMaker-success:", card.originalName);
+
+            if (card?.isCropped) return;
+
+            let cardName = path.basename(card?.filename, path.extname(card?.filename))
+            let imagePath = path.join(card.path, card.cardBoth as string);
+
+            card.cardFront = `${cardName}-front.png`
+            const frontOutputPath = path.join(card.path, card.cardFront);
+            const frontCropOptions = {
+              left: 44,
+              top: 44,
+              width: 1848,
+              height: 1131,
+            };
+
+            card.cardBack = `${cardName}-back.png`
+            const backOutputPath = path.join(card.path, card.cardBack);
+            const backCropOptions = {
+              left: 44,
+              top: 1223,
+              width: 1848,
+              height: 1131,
+            };
+
+            if (card?.cardType == 'ayushman') {
+              frontCropOptions.left = 438;
+              frontCropOptions.top = 397;
+              frontCropOptions.width = 1272;
+              frontCropOptions.height = 638;
+
+              backCropOptions.left = 1856;
+              backCropOptions.top = 397;
+              backCropOptions.width = 1270;
+              backCropOptions.height = 638;
+            }
+
+            try {
+              await cropImage(imagePath, frontOutputPath, frontCropOptions);
+              await cropImage(imagePath, backOutputPath, backCropOptions)
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
+              event.reply('cardMaker-image-extracted-success', page);
+              console.log("cardMaker-image-extracted-success");
+            } catch (error) {
+              event.reply('cardMaker-image-extracted-failure', { page, card });
+            }
+
+
+          })
+          .catch((error) => {
+            console.log('ddddddddddddddddddddddddddddd', error);
+            card.isConverted = false;
+            card.errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || 'Something went wrong while converting the pdf.';
+            if (page?.pdfs) {
+              page.pdfs[i] = card;
+            }
+            event.reply('cardMaker-failure', { page, card });
+          });
+      } else if (card?.cardType == 'aadhaar') {
+
+        console.log('aadhaar', card)
+
+        pdf2image(card)
+          .then(async (newCard: cardMakerPDF) => {
+            // @ts-ignore
+            page.pdfs[i] = card = newCard;
+            event.reply('cardMaker-success', page);
+            console.log("pdf2image cardMaker-success:", card.originalName);
+
+            if (card?.isCropped) return;
+
+            let cardName = path.basename(card?.filename, path.extname(card?.filename))
+            let imagePath = path.join(card.path, card.cardBoth as string);
+
+            card.cardFront = `${cardName}-front.png`
+            card.cardBack = `${cardName}-back.png`
+
+            try {
+              await extractAadhaarCard(card)
+              card.isCropped = true;
+              if (page.pdfs?.length) {
+                page.pdfs[i] = card;
+              }
+              event.reply('cardMaker-image-extracted-success', page);
+              console.log("cardMaker-image-extracted-success");
+            } catch (error) {
+              event.reply('cardMaker-image-extracted-failure', { page, card });
+            }
+
+
+          })
+          .catch((error) => {
+            card.isConverted = false;
+            card.errorMessage = error.message.match(/Command Line Error:\s*(.*)/)?.[1] || 'Something went wrong while converting the pdf.';
+            // @ts-ignore
+            page.pdfs[i] = card;
+            event.reply('cardMaker-failure', { page, card });
+          });
+
+      } else if (card?.cardType == 'custom') {
+
+        // @ts-ignore
+        page.pdfs[i] = card;
+        event.reply('cardMaker-success', page);
+        console.log("pdf2image cardMaker-success:", card.originalName);
+
+        await sleep(500)
+        card.isCropped = true;
+        event.reply('cardMaker-image-extracted-success', page);
+        console.log("cardMaker-image-extracted-success");
+
+
+      }
 
     })
   }
@@ -484,3 +538,129 @@ ipcMain.on("cardMakerCreatePDF", async (event, page: cardMaker) => {
     event.reply('cardMakerCreatePDF-failure', page);
   }
 })
+
+ipcMain.on("printFile", async (event, file: any) => {
+  print(file.path, { ...file.options, ...{ silent: true } }).then(() => {
+    console.log(`Printed file: ${file}`)
+  }).catch(err => {
+    console.error(`Error printing file: ${file}`, err)
+  })
+})
+
+
+ipcMain.on('generate-pdf', async (event, obj: { htmlContent: string, head: string, isPrint?: boolean, printPDF?: boolean, filename?: string }) => {
+
+  const win = new BrowserWindow({
+    show: isDev,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    }
+  });
+
+  try {
+
+    let cssFiles: string[] = []
+
+    if (!isDev) {
+      console.log("Running in production mode");
+      const cssDir = path.join(process.resourcesPath, 'app.asar.unpacked/dist/assets');
+      const files = fs.readdirSync(cssDir);
+
+      // Read all .css files
+      cssFiles = files
+        .filter(file => file.endsWith('.css'))
+        .map(file => fs.readFileSync(path.join(cssDir, file), 'utf8'));
+
+    }
+
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        ${cssFiles.map((el, i) => `<style type="text/css" id="inserted-${i}">${el}</style>`).join('\n')}
+        ${obj.head}
+      </head>
+      <body>
+        ${obj.htmlContent}
+      </body>
+    </html>
+  `;
+
+    await win.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`);
+
+    await sleep(500);
+
+
+    if (obj?.printPDF) {
+      console.log('Printing to PDF...')
+      const pdfOptions = {
+        color: true,
+        margins: {
+          marginType: 'printableArea' as "printableArea", // 'none', 'printableArea', or custom
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0
+        }, // Default margins
+        pageSize: "A4" as "A4",
+        printBackground: true,
+        printSelectionOnly: false,
+        landscape: false,
+      };
+
+      const data = await win.webContents.printToPDF(pdfOptions);
+
+      const { canceled, filePath } = await dialog.showSaveDialog(win as BrowserWindow, {
+        title: 'Save PDF',
+        defaultPath: path.join(os.homedir(), 'Downloads', obj?.filename || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`),
+      });
+
+      if (!canceled || filePath) {
+        fs.writeFileSync(filePath, data)
+      }
+
+      win.close();
+      event.reply('generate-pdf-reply', { success: true, message: 'Printed successfully' })
+    }
+
+    if (obj?.isPrint) {
+      console.log('Printing...')
+
+      const printOptions = {
+        silent: false,
+        printBackground: true,
+        color: true,
+        margins: {
+          marginType: 'none' as "none", // 'none', 'printableArea', or custom
+        },
+        pageSize: "A4" as "A4",
+        printSelectionOnly: false,
+        landscape: false,
+      }
+
+      win.webContents.print(printOptions, () => {
+        win.close();
+        event.reply('generate-pdf-reply', { success: true, message: 'Printed successfully' })
+      })
+    }
+
+
+  } catch (error) {
+    console.error(error)
+  }
+
+});
+
+const fsPromise = require('fs').promises;
+ipcMain.handle('read-css-file', async (event, fileUrl) => {
+  try {
+    // Convert file:// URL to filesystem path
+    const filePath = fileUrl.replace('file://', '');
+    // Read the CSS file from app.asar
+    const content = await fsPromise.readFile(filePath, 'utf-8');
+    return content;
+  } catch (error: any) {
+    throw new Error(`Failed to read CSS file: ${error.message}`);
+  }
+});

@@ -15,7 +15,13 @@
     "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "plugins": [
+      {
+        "name": "@vue/language-plugin-pug"
+      }
+    ],
+    "declaration": true
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

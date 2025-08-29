@@ -30,7 +30,13 @@ export default defineConfig({
   },
 
   plugins: [
-    vue(),
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag: string) => tag === "webview",
+        },
+      },
+    }),
 
     // https://github.com/antfu/unplugin-auto-import
     AutoImport({
@@ -91,7 +97,8 @@ export default defineConfig({
 
     // Use Node.js API in the Renderer-process
     renderer({
-      nodeIntegration: true
+      nodeIntegration: true,
+      webviewTag: true
     }),
   ],
 

@@ -26,27 +26,27 @@ export const useLordStore = defineStore('lord', () => {
     lowdb.write();
   }
 
-  console.log('Database path: ' + dbPath, process.env);
+  // console.log('Database path: ' + dbPath, process.env);
 
   axios.get(apiURL).then((response) => {
-    console.log('Online LordStore Updated', response.data);
+    // console.log('Online LordStore Updated', response.data);
     db.value = response.data
   }).catch(() => {
     // @ts-ignore
     db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData).data;
-    console.log('Offline LordStore Updated');
+    // console.log('Offline LordStore Updated');
   })
 
 
   async function reloadDatabase() {
-    console.log('Reloading database...');
+    // console.log('Reloading database...');
     await axios.get(apiURL).then((response) => {
       db.value = response.data
-      console.log('Online LordStore Updated', db.value);
+      // console.log('Online LordStore Updated', db.value);
     }).catch(() => {
       // @ts-ignore
       db.value = JSONFileSyncPreset<$lordData>(dbPath, {} as $lordData).data;
-      console.log('Offline LordStore Updated');
+      // console.log('Offline LordStore Updated');
     })
   }
 
@@ -61,7 +61,6 @@ export const useLordStore = defineStore('lord', () => {
   async function saveMain() {
     try {
       await axios.post(`http://${ip.address()}:9457/api/v1/savedata`, { data: db.value })
-
     } catch (error) {
       console.error('Error while saving main data', error);
     }

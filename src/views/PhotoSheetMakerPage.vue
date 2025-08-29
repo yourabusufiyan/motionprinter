@@ -86,6 +86,7 @@ const gridCells = computed(() => {
   return gridCellsFunc(selectedGrid.value)
 })
 const gridStyle = computed(() => {
+  const isCustom = selectedGrid.value == 'custom';
   return {
     ...gridStyleFunc(selectedGrid.value, cellGap.value.toString() + 'mm'),
     ...{
@@ -106,12 +107,12 @@ const isInAction = computed(() => isPrinting.value || isPdfDownloading.value)
 
 function gridCellsFunc(val: string) {
   const [cols, rows] = val.split('x').map(Number)
+  const isCustom = selectedGrid.value == 'custom';
   return cols * rows
 }
 
 function gridStyleFunc(val: string, gap: string = '5mm') {
   const [cols, rows] = val.split('x');
-  const isCustom = val === 'custom';
   return {
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
     gridTemplateRows: `repeat(${rows}, 1fr)`,
@@ -396,10 +397,10 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
               @click="handleCellClick(index, $event, false)"
             ) Click to add photo
 
-    input(
+    input.hidden(
       type="file"
       ref="fileInput"
-      style="display: none"
+      accept="image/*"
       multiple
       @change="handleFileSelect"
     )
@@ -481,7 +482,6 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                   lang="En"
                   v-model:pureColor="cellBorderColor"
                 )
-            Button(@click="removeEmptyCell()") Remove Empty Cell
 
         AccordionItem(value="grids")
           AccordionTrigger.text-lg Layouts
@@ -495,16 +495,17 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 class="hover:cursor-pointer"
               )
                 Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
-                
+
+        .mt-4 
+        Button(@click="removeEmptyCell()" :disabled="!currentPage.photos?.length") Remove Empty Cell
 
     .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
       Button.hidden.bg-slate-700(@click="doAction(false)" :disabled="isInAction || !currentPage?.photos?.length" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
         | Print
-      Button(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length") 
+      Button(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPdfDownloading")
         | Download PDF
-pre {{currentPage}}
 </template>
 
 <style lang="stylus" scoped>
@@ -556,8 +557,7 @@ pre {{currentPage}}
   color #666
   cursor pointer
 
-.color-picker-container ::v-deep(.vc-color-wrap) 
-  width 100%
+.color-picker-container ::v-deep(.vc-color-wrap)
   height 36px
-  @apply rounded-md 
+  @apply w-full rounded-md
 </style>

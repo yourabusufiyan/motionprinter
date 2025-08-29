@@ -1,6 +1,17 @@
+1.1.0
+* Fixed
+  1. Auto closed sumantra after selecting printer
+  2. PDF password auto deleting removed
+  3. Improved speed of processing of Aadhaar Card
+
 1.0.9
+* Fixed
+  1. Photo layout is not working in production in photosheet maker
+  2. Incorrect password in AADHAAR card solved
+
 * Improvements
   1. Fix bug in Custom Front and Back card in CardMaker
+
 * Added 
   1. photo border stroke and stroke color on photosheet maker 
   2. Margin in photosheet maker

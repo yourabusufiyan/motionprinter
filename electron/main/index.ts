@@ -115,7 +115,7 @@ async function createWindow() {
       click: () => win?.show(),
     },
     {
-      label: 'Close App',
+      label: 'Quit',
       click: () => app.quit(),
     },
   ]);
@@ -240,6 +240,9 @@ ipcMain.on('download-file', async (event, file) => {
 
 async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
   return new Promise(async (resolve, reject) => {
+
+    console.time('pdf2image');
+
     let opts = {
       format: 'png',
       scale: 3_508,
@@ -249,16 +252,26 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
       args: {}
     };
 
-    if (file?.password) {
-      opts.args = {
-        'opw': file.password || path.basename(file.destination, path.extname(file.destination)).toUpperCase()
-      }
+    console.log(
+      'opts',
+      file.originalName as string,
+      path.extname(file.originalName as string),
+      path.basename(file.originalName as string),
+      path.basename(file.originalName as string, path.extname(file.originalName as string)).toUpperCase(),
+    )
+
+    opts.args = {
+      'opw': file?.password || path.basename(file.originalName as string, path.extname(file.originalName as string)).toUpperCase()
     }
 
     pdf.info(file.destination, opts)
       .then((pdfinfo: any) => {
 
         opts.scale = Math.abs(pdfinfo.height_in_pts * (300 / 72))
+
+        if (file.cardType == 'aadhaar') {
+          opts.scale = Math.abs(pdfinfo.width_in_pts * (240 / 72))
+        }
 
         pdf.convert(file.destination, opts)
           .then((res: any) => {
@@ -281,6 +294,7 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
         console.error(error);
         reject(error);
       })
+    console.timeEnd('pdf2image');
   })
 }
 
@@ -453,6 +467,8 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
           });
       } else if (card?.cardType == 'aadhaar') {
 
+        console.log('aadhaar', card)
+
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
             // @ts-ignore
@@ -524,7 +540,7 @@ ipcMain.on("cardMakerCreatePDF", async (event, page: cardMaker) => {
 })
 
 ipcMain.on("printFile", async (event, file: any) => {
-  print(file.path, file.options).then(() => {
+  print(file.path, { ...file.options, ...{ silent: true } }).then(() => {
     console.log(`Printed file: ${file}`)
   }).catch(err => {
     console.error(`Error printing file: ${file}`, err)

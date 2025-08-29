@@ -1,6 +1,6 @@
 {
   "name": "motionprinter",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "MotionPrinter makes your printing easy.",
   "author": "Abu Sufiyan<abusufiyan@engineer.com>",
   "license": "MIT",
@@ -99,8 +99,8 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nanoid": "^5.0.9",
-    "pdf-poppler": "^0.2.1",
-    "pdf-to-printer": "^5.6.0",
+    "pdf-poppler": "https://github.com/yourabusufiyan/pdf-poppler-next.git",
+    "pdf-to-printer": "github:yourabusufiyan/pdf-to-printer-next",
     "pdfkit": "^0.16.0",
     "pug": "^3.0.3",
     "radix-vue": "^1.9.12",

@@ -421,10 +421,10 @@ const onMakeNewPDF = async () => {
       class="bg-blue-600 text-white"
     ) #[Printer.py-1.-ml-1] New PDF
 
-  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="page?.pdfs")
+  .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF
     .card-container
-      .flex.items-center.justify-center.gap-4(v-for="card in page.pdfs?.filter(isObject)" :key="card.id")
+      .flex.items-center.justify-center.gap-4(v-for="card in page?.pdfs?.filter(isObject)" :key="card.id")
         .card-front.flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
           img(
             v-if="card?.cardFront"

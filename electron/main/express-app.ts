@@ -448,6 +448,10 @@ class expressAppClass {
       fileData.path = expressAppClass.dir[1]
       fileData.size = sampleFile.size
       fileData.temp = req.body?.temp == 'true'
+      if (req.body?.provider) {
+        // @ts-ignore for pan card or any others cards in future
+        fileData.provider = req.body?.provider;
+      }
 
       let o: toPrintsCommandsFile = {
         ...fileData, ...{

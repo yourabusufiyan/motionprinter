@@ -17,7 +17,7 @@ import { isUndefined, last } from 'lodash';
 
 import expressAppClass from './express-app'
 import type { cardMaker, cardMakerPDF } from './express-app-d'
-import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard, extractAadhaarCard } from './../helpers/cardmakers'
+import { createA4PDFwithEshremCards, createA4WithImagesPDF, cropImage, extractEshramCard, extractAadhaarCard, extractPanCard } from './../helpers/cardmakers'
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
@@ -267,10 +267,10 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
     pdf.info(file.destination, opts)
       .then((pdfinfo: any) => {
 
-        opts.scale = Math.abs(pdfinfo.height_in_pts * (300 / 72))
+        opts.scale = Math.floor(Math.abs(pdfinfo.height_in_pts * (300 / 72)))
 
         if (file.cardType == 'aadhaar') {
-          opts.scale = Math.abs(pdfinfo.width_in_pts * (240 / 72))
+          opts.scale = Math.floor(Math.abs(pdfinfo.width_in_pts * (240 / 72)))
         }
 
         pdf.convert(file.destination, opts)
@@ -279,6 +279,7 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
             file.opts = opts;
             file.cardBoth = `${opts.out_prefix}-1.png`
             console.log('Successfully converted', opts);
+            console.timeEnd('pdf2image');
             resolve(file);
           })
           .catch((error: any) => {
@@ -292,9 +293,9 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
       })
       .catch((error: any) => {
         console.error(error);
+        console.timeEnd('pdf2image');
         reject(error);
       })
-    console.timeEnd('pdf2image');
   })
 }
 
@@ -396,7 +397,7 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
           }
         );
 
-      } else if (card?.cardType == 'abha' || card?.cardType == 'ayushman') {
+      } else if (['abha', 'ayushman', 'pan'].includes(card?.cardType as string)) {
 
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
@@ -439,6 +440,23 @@ ipcMain.on("cardMaker", async (event, page: cardMaker) => {
               backCropOptions.top = 397;
               backCropOptions.width = 1270;
               backCropOptions.height = 638;
+            }
+
+            if (card?.cardType == 'pan') {
+              await extractPanCard(card)
+              card.isCropped = true;
+              console.log('pan card cropping and provider ', card.provider)
+              if (card.provider == 'uti') {
+                frontCropOptions.left = 79;
+                frontCropOptions.top = 2522;
+                frontCropOptions.width = 954;
+                frontCropOptions.height = 595;
+
+                backCropOptions.left = 1171;
+                backCropOptions.top = 2522;
+                backCropOptions.width = 954;
+                backCropOptions.height = 595;
+              }
             }
 
             try {

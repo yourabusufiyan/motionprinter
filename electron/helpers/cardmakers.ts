@@ -8,7 +8,7 @@ import { intToRGBA } from "@jimp/utils";
 
 import type { Region } from 'sharp'
 import type { cardMaker, cardMakerPDF } from '../main/express-app-d'
-import { chunk } from "lodash";
+import { last, toString } from "lodash";
 
 function areConsecutive(...args: (number | number[])[]): boolean {
   // Normalize input: if first arg is an array, use it, otherwise use args
@@ -165,14 +165,6 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
         for (let x = 0; x < width; x++) {
           let borderCount = 0;
 
-          // let skipped_once = false;
-          // if (borders.length && !areConsecutive(borders) && !skipped_once) {
-          //   x = width * 0.47; // Skip next 10 rows to avoid close detections
-          //   console.log('skipping rows to avoid close detections to ', x);
-          //   skipped_once = true;
-          //   continue;
-          // }
-
           for (let y = yStart; y <= yEnd; y++) {
             const idx = (y * width + x) * 4;
             if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
@@ -227,8 +219,6 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
         regions.map(async (region, index) => {
           if (region.w < 100) return region;
 
-          console.log("aaddhar croped", index, frontOutputPath, backOutputPath)
-          console.log("region.w < 100croped", region.w < 100)
 
           let cropped = image.clone().crop(region);
 
@@ -251,8 +241,8 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
           isFront = false;
         })
       );
-      resolve(pdf)
       console.timeEnd("extractAadhaarCard");
+      resolve(pdf)
       console.log(`Extracted aadhaar card`);
     } catch (error) {
       console.error("Error:", error);
@@ -260,6 +250,150 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
     }
   })
 }
+
+export async function extractPanCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time("extractPanCard");
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename))
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`)
+    const outputFormatFileName = `${path.join(pdf.path, path.basename(inputPath, path.extname(inputPath)))}`
+
+    const BORDER_COLOR = { r: 31, g: 31, b: 31 };
+    const COLOR_TOLERANCE = 5;
+    const MIN_BORDER_RATIO = 0.65;
+
+    try {
+      const image = await Jimp.read(inputPath);
+      const { width, height, data } = image.bitmap;
+
+      // Precalculate pixel check function
+      const isBorder = (r: number, g: number, b: number) =>
+        Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+        Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+        Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+      // Optimized border detection using buffer directly
+      const getHorizontalBorders = () => {
+        const borders = [];
+        const pixelThreshold = width * MIN_BORDER_RATIO;
+        let skipped_once = false;
+
+        for (let y = 0; y < height; y++) {
+          let borderCount = 0;
+          const yOffset = y * width * 4;
+
+          if (
+            borders.length > 2 &&
+            !skipped_once &&
+            !areConsecutive(borders.concat([y]))
+          ) {
+            console.log("skipping rows at", y);
+            y = Math.floor(height * 0.8);
+            skipped_once = true;
+            continue;
+          }
+
+          for (let x = 0; x < width; x++) {
+            const idx = yOffset + x * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(y);
+                break; // Early exit for rows
+              }
+            }
+          }
+
+
+        }
+        console.log('horizontal borders', borders)
+        return borders;
+      };
+
+      // Vertical border detection within horizontal regions
+      const getVerticalBorders = (yStart: number, yEnd: number) => {
+        const borders = [];
+        const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+        for (let x = 0; x < width; x++) {
+          let borderCount = 0;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const idx = (y * width + x) * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(x);
+                break; // Early exit for columns
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Main processing
+      const horizontalBorders = getHorizontalBorders();
+      const regions = [];
+
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        if (yEnd - yStart < 5) continue;
+        const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+        // Generate regions
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const region = {
+            x: verticalBorders[j] + 1,
+            y: yStart,
+            w: verticalBorders[j + 1] - verticalBorders[j] - 1,
+            h: yEnd - yStart + 1,
+          };
+
+          if (region.w > 0 && region.h > 0) {
+            regions.push(region);
+          }
+        }
+      }
+
+      // Save regions
+      if (regions.length === 0) {
+        console.log("No regions found");
+        reject(pdf);
+        return;
+      }
+
+      console.log('regions', regions)
+
+      let isFront = true;
+
+      await Promise.all(
+        regions.map(async (region, i) => {
+          if (region.w < 100) return region;
+
+          await image.clone()
+            .crop(region)
+            .write(`${outputFormatFileName}.png`);
+
+        })
+      );
+      console.timeEnd("extractPanCard");
+      resolve(pdf)
+      console.log(`Extracted Pan Card`, outputFormatFileName);
+    } catch (error) {
+      console.error("Error:", error);
+      reject(pdf)
+    }
+  })
+}
+
+
+
 
 export async function createA4PDFwithEshremCards(obj: cardMaker) {
 

@@ -6,7 +6,7 @@ import { useLordStore } from "@/stores/LordStore";
 import { v7 as uuidv7 } from 'uuid';
 import { ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron/renderer';
-import { cloneDeep, isEqual, isNull, isObject, toString, merge, last, find, unionBy, uniqBy } from 'lodash';
+import { cloneDeep, isEqual, isNull, isObject, toString, merge, last, find, unionBy, uniqBy, reduce } from 'lodash';
 import path from 'path';
 import { shell } from 'electron';
 
@@ -25,7 +25,8 @@ import { Loader2, RotateCcw, FileText, Download, Plus, Trash2, IdCard, Printer }
 
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | null;
+  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | 'pan' | null;
+  provider?: 'uti' | null;
   file: File | null;
   password?: string;
   message?: string;
@@ -47,14 +48,18 @@ const isChangedAfterCreatingPDF = ref(false);
 
 const options = ref([
   { label: "Custom Card", value: "custom" },
-  { label: "E-Shram", value: "eshram" },
-  { label: "Abha", value: "abha" },
-  { label: "Aadhaar", value: "aadhaar" },
-  { label: "Ayushman", value: "ayushman" },
+  { label: "E-Shram Card", value: "eshram" },
+  { label: "Abha Card", value: "abha" },
+  { label: "Aadhaar Card", value: "aadhaar" },
+  { label: "Ayushman Card", value: "ayushman" },
+  { label: "Pan Card", value: "pan" },
 ].sort((a, b) => {
   if (b.value == 'custom') return 1;
   return a.label.localeCompare(b.label)
 }));
+const providers = ref([
+  { label: "UTI/ITSL", value: "uti" },
+]);
 
 
 
@@ -126,6 +131,10 @@ const handleFileUpload = async (event: Event, index: number) => {
   formData.append("password", repeater.value[index]?.password?.toString() || '');
   formData.append("addedBy", lordStore.db.computerName || '');
 
+  if (repeater.value[index].cardType == 'pan' && repeater.value[index].provider) {
+    formData.append("provider", repeater.value[index].provider.toString() as string);
+  }
+
   if (repeater.value[index].cardType?.toString() == 'custom') {
     if (target.id == 'card-front') {
       formData.append("cardFront", 'true');
@@ -138,7 +147,7 @@ const handleFileUpload = async (event: Event, index: number) => {
     formData.append("makerID", page.value.id);
   }
 
-  console.log('goin to make a upload request')
+  console.log('going to make a upload request')
 
   try {
     const response = await axios.post(
@@ -302,6 +311,14 @@ const onMakeNewPDF = async () => {
   isDataToProcess.value = false
 };
 
+const disabledUploadFile = (field: RepeaterItem) => {
+
+  if (!field.cardType) return true;
+
+  if (field.cardType === 'pan' && !field.provider) return true;
+
+  return false;
+};
 
 </script>
 
@@ -338,6 +355,18 @@ const onMakeNewPDF = async () => {
               :value="option.value"
             ) {{ option.label }}
 
+      .select-container.w-40.place-self-end(v-if="field.cardType === 'pan'")
+        Label.mb-1(for="pan-provider") Pan Provider 
+        Select#pan-provider(v-model="field.provider")
+          SelectTrigger.p-5
+            SelectValue(placeholder="Select the Provider")
+          SelectContent
+            SelectItem(
+              v-for="provider in providers"
+              :key="provider.value"
+              :value="provider.value"
+            ) {{ provider.label }}
+
       .password-container.w-40.place-self-end(v-if="field.cardType === 'aadhaar'")
         Input(
           v-model="field.password"
@@ -349,12 +378,12 @@ const onMakeNewPDF = async () => {
       
       .grid.w-full.max-w-sm.items-center.place-self-end(
         class="gap-1.5"
-        :class="{ 'hover:cursor-not-allowed': !field.cardType }"
+        :class="{ 'hover:cursor-not-allowed': disabledUploadFile(field) }"
         v-if="field.cardType != 'custom'"
       )  
         Label(for="card-pdf") Card's PDF
         Input#card-pdf(
-          :disabled="!field.cardType"
+          :disabled="disabledUploadFile(field)"
           :key="field.cardType"
           @change="(e: Event) => handleFileUpload(e, index)"
           type="file"

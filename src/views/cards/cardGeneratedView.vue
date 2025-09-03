@@ -10,7 +10,6 @@ import { useLordStore } from '@/stores/LordStore';
 //     position: { x: number, y: number },
 //   }
 // }>();
-
 </script>
 
 <template lang="pug">

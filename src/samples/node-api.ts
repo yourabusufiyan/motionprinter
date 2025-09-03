@@ -6,7 +6,7 @@ ipcRenderer.on('main-process-message', (_event, ...args) => {
   console.log('[Receive Main-process message]:', ...args);
 });
 
-ipcRenderer.on("server-log-entry", (_event, data) => {
+ipcRenderer.on('server-log-entry', (_event, data) => {
   console.log('server-log-entry', data);
 });
 

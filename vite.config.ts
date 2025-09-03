@@ -33,7 +33,7 @@ export default defineConfig({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag: string) => tag === "webview",
+          isCustomElement: (tag: string) => tag === 'webview',
         },
       },
     }),
@@ -51,7 +51,7 @@ export default defineConfig({
         onstart(options) {
           if (process.env.VSCODE_DEBUG) {
             console.log(
-              /* For `.vscode/.debug.script.mjs` */ '[startup] Electron App'
+              /* For `.vscode/.debug.script.mjs` */ '[startup] Electron App',
             );
           } else {
             options.startup();
@@ -64,10 +64,10 @@ export default defineConfig({
             outDir: 'dist-electron/main',
             rollupOptions: {
               external: Object.keys(
-                'dependencies' in pkg ? pkg.dependencies : {}
+                'dependencies' in pkg ? pkg.dependencies : {},
               ).concat([
                 'node_modules/electron-store/index.js',
-                'electron/main/express-app.ts'
+                'electron/main/express-app.ts',
               ]),
             },
           },
@@ -87,7 +87,7 @@ export default defineConfig({
             outDir: 'dist-electron/preload',
             rollupOptions: {
               external: Object.keys(
-                'dependencies' in pkg ? pkg.dependencies : {}
+                'dependencies' in pkg ? pkg.dependencies : {},
               ),
             },
           },
@@ -98,18 +98,18 @@ export default defineConfig({
     // Use Node.js API in the Renderer-process
     renderer({
       nodeIntegration: true,
-      webviewTag: true
+      webviewTag: true,
     }),
   ],
 
   server: process.env.VSCODE_DEBUG
     ? (() => {
-      const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL);
-      return {
-        host: url.hostname,
-        port: +url.port,
-      };
-    })()
+        const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL);
+        return {
+          host: url.hostname,
+          port: +url.port,
+        };
+      })()
     : undefined,
   clearScreen: false,
 });

@@ -3,7 +3,6 @@ console.log('[App.vue]', `aboutpage.vue started`);
 
 const { t } = useI18n();
 console.log('[App.vue]', `aboutpage.vue ended`);
-
 </script>
 
 <template>

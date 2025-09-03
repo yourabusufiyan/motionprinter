@@ -1,12 +1,11 @@
 <script lang="ts" setup>
-import { MoonIcon, SunIcon } from '@radix-icons/vue'
+import { MoonIcon, SunIcon } from '@radix-icons/vue';
 import { useRoute, useRouter } from 'vue-router';
 
-const route = useRoute()
+const route = useRoute();
 const isDark = useDark();
 const toggleDark = useToggle(isDark);
 const { t, availableLocales, locale } = useI18n();
-
 </script>
 
 <template lang="pug">

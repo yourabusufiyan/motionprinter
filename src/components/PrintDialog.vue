@@ -1,108 +1,139 @@
 <script setup lang="ts">
-import { Button as uiButton } from '@/components/ui/button'
+import { Button as uiButton } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue, } from '@/components/ui/select'
-import { NumberField, NumberFieldContent, NumberFieldDecrement, NumberFieldIncrement, NumberFieldInput, } from '@/components/ui/number-field'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog'
-import { toast } from 'vue-sonner'
-
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  NumberField,
+  NumberFieldContent,
+  NumberFieldDecrement,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { toast } from 'vue-sonner';
 
 import { useLordStore } from '@/stores/LordStore';
-import { ref, computed, onMounted, watch } from 'vue'
-import { find, size, isNumber } from 'lodash'
-import { ChevronDownIcon, MinusIcon, PlusIcon } from '@radix-icons/vue'
-import axios from 'axios'
-import { VuePDF, usePDF } from '@tato30/vue-pdf'
+import { ref, computed, onMounted, watch } from 'vue';
+import { find, size, isNumber } from 'lodash';
+import { ChevronDownIcon, MinusIcon, PlusIcon } from '@radix-icons/vue';
+import axios from 'axios';
+import { VuePDF, usePDF } from '@tato30/vue-pdf';
 
-import type { connectedPC } from '@/declarations/LordStore'
+import type { connectedPC } from '@/declarations/LordStore';
 
-import '@tato30/vue-pdf/style.css'
+import '@tato30/vue-pdf/style.css';
 
-const lordStore = useLordStore()
+const lordStore = useLordStore();
 
-const computersList = computed(() => lordStore.db.ConnectedPCs)
-const selectedComputer = ref('')
-const selectedComputerData = computed(() => find(lordStore.db.ConnectedPCs, ['ip', selectedComputer.value]))
+const computersList = computed(() => lordStore.db.ConnectedPCs);
+const selectedComputer = ref('');
+const selectedComputerData = computed(() =>
+  find(lordStore.db.ConnectedPCs, ['ip', selectedComputer.value]),
+);
 
-const printerList = computed(() => selectedComputerData.value?.printers || [])
-const selectedPrinter = ref('')
-const selectedPrinterData = computed(() => find(selectedComputerData.value?.printers, ['name', selectedPrinter.value]))
+const printerList = computed(() => selectedComputerData.value?.printers || []);
+const selectedPrinter = ref('');
+const selectedPrinterData = computed(() =>
+  find(selectedComputerData.value?.printers, ['name', selectedPrinter.value]),
+);
 
-
-const copies = ref(1)
-const pages = ref('all')
-const customPages = ref('')
-const colorMode = ref('black_and_white')
-const paperSizes = ref('A4')
+const copies = ref(1);
+const pages = ref('all');
+const customPages = ref('');
+const colorMode = ref('black_and_white');
+const paperSizes = ref('A4');
 const paperSizesData = computed(() => {
   let o: { [property: string]: string } = {
     ...{
-      "A2": "A2",
-      "A6": "A6",
-      "A3": "A3",
-      "A4": "A4",
-      "A5": "A5",
-      "letter": "Letter",
-      "legal": "Legal",
-      "tabloid": "Tabloid",
-      "statement": "Statement",
+      A2: 'A2',
+      A6: 'A6',
+      A3: 'A3',
+      A4: 'A4',
+      A5: 'A5',
+      letter: 'Letter',
+      legal: 'Legal',
+      tabloid: 'Tabloid',
+      statement: 'Statement',
     },
-  }
-  return Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {} as { [property: string]: string })
-})
-const scale = ref('fit')
-const customScale = ref(100)
-const paperPerSheet = ref('1')
-const margin = ref('default')
-const towSidedPrinting = ref('simplex')
+  };
+  return Object.keys(o)
+    .sort()
+    .reduce((r, k) => ((r[k] = o[k]), r), {} as { [property: string]: string });
+});
+const scale = ref('fit');
+const customScale = ref(100);
+const paperPerSheet = ref('1');
+const margin = ref('default');
+const towSidedPrinting = ref('simplex');
 
-const isDialogOpen = ref(false)
-const fileInput = ref<any>(null) // for resetting the file input only
-const file = ref() // for storing the file data
-const isFileUploading = ref(false)
-const isFileUploaded = ref(false)
-const uploadFiled = ref({}) // storing the uploaded file responded data
-const pdfBuffer = ref('')
-const { pdf, pages: pdfPages, info } = usePDF(pdfBuffer)
-const isRangeValid = ref(true)
-const rangeErrorMessage = ref('Number should be under the range.')
-
+const isDialogOpen = ref(false);
+const fileInput = ref<any>(null); // for resetting the file input only
+const file = ref(); // for storing the file data
+const isFileUploading = ref(false);
+const isFileUploaded = ref(false);
+const uploadFiled = ref({}); // storing the uploaded file responded data
+const pdfBuffer = ref('');
+const { pdf, pages: pdfPages, info } = usePDF(pdfBuffer);
+const isRangeValid = ref(true);
+const rangeErrorMessage = ref('Number should be under the range.');
 
 // I do not have know about Event type. that why i assigned it to :any
 function handleFileUpload(event: any) {
+  console.log(event);
 
-  console.log(event)
-
-  isDialogOpen.value = true
+  isDialogOpen.value = true;
 
   if (event?.target?.files && event.target.files[0]) {
+    console.log(event?.target?.files[0]?.type);
 
-    console.log(event?.target?.files[0]?.type)
-
-    file.value = event.target.files[0]
+    file.value = event.target.files[0];
     const reader = new FileReader();
 
     reader.onload = function (e) {
-      console.log('e.target.result', typeof e?.target?.result)
+      console.log('e.target.result', typeof e?.target?.result);
       if (e?.target?.result) {
         pdfBuffer.value = e?.target?.result as string;
       }
     };
 
     reader.readAsDataURL(event.target.files[0]);
-
   }
-
 }
 
 function commandToPrint(filename: string = '') {
-
   const options = {
     printer: selectedPrinter.value,
-    pages: pages.value == 'all' ? 'all' : pages.value == 'custom' ? customScale.value : '',
+    pages:
+      pages.value == 'all'
+        ? 'all'
+        : pages.value == 'custom'
+          ? customScale.value
+          : '',
     // @ts-expect-error : here we want pages value to be even or odd only
     subset: pages.value == 'odd' && pages.value == 'even' ? pages.value : '',
     monochrome: colorMode.value != 'color',
@@ -111,127 +142,153 @@ function commandToPrint(filename: string = '') {
     silent: true,
     printDialog: false,
     side: towSidedPrinting.value,
-    copies: +copies.value
-  }
+    copies: +copies.value,
+  };
 
-  axios.post(`http://${selectedComputerData.value?.ip}:9457/api/v1/print/`, { filename, options }, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  }).then((response) => {
-    if (response.data?.print == 'successful') {
-      console.log('Print successful')
-      if (file.value?.name) {
-        toast.success('Printed' + (selectedComputerData.value?.computerName ? ' from ' + selectedComputerData.value.computerName : '...'), {
-          description: file.value?.name
-        })
+  axios
+    .post(
+      `http://${selectedComputerData.value?.ip}:9457/api/v1/print/`,
+      { filename, options },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
+    )
+    .then((response) => {
+      if (response.data?.print == 'successful') {
+        console.log('Print successful');
+        if (file.value?.name) {
+          toast.success(
+            'Printed' +
+              (selectedComputerData.value?.computerName
+                ? ' from ' + selectedComputerData.value.computerName
+                : '...'),
+            {
+              description: file.value?.name,
+            },
+          );
+        }
+      } else {
+        toast.error('Something went wrong...', {
+          description: file.value?.name,
+        });
       }
-    } else {
-      toast.error('Something went wrong...', {
-        description: file.value?.name
-      })
-    }
-    isDialogOpen.value = false
-    if (fileInput.value?.value) {
-      fileInput.value.value = ''
-    } else {
-      fileInput.value.value = null
-    }
-    file.value = null
-    isFileUploading.value = false
-    isFileUploaded.value = false
-    uploadFiled.value = {}
-    pdfBuffer.value = ''
-    console.log('commandToPrint : ', response.data)
-  }).catch((err: any) => {
-    console.log('commandToPrint : ', err)
-  })
+      isDialogOpen.value = false;
+      if (fileInput.value?.value) {
+        fileInput.value.value = '';
+      } else {
+        fileInput.value.value = null;
+      }
+      file.value = null;
+      isFileUploading.value = false;
+      isFileUploaded.value = false;
+      uploadFiled.value = {};
+      pdfBuffer.value = '';
+      console.log('commandToPrint : ', response.data);
+    })
+    .catch((err: any) => {
+      console.log('commandToPrint : ', err);
+    });
 }
 
 function handlePrint() {
-
   if (size(file)) {
+    console.log('handlePrint - file : ', selectedComputerData);
 
-    console.log('handlePrint - file : ', selectedComputerData)
+    isDialogOpen.value = false;
 
-    isDialogOpen.value = false
+    toast.info(
+      'Sending ' +
+        (selectedComputerData.value?.computerName
+          ? ' to ' + selectedComputerData.value.computerName
+          : '...'),
+      {
+        description: file.value?.name ? file.value?.name : '',
+      },
+    );
 
-    toast.info('Sending ' + (selectedComputerData.value?.computerName ? ' to ' + selectedComputerData.value.computerName : '...'), {
-      description: file.value?.name ? file.value?.name : ''
-    })
+    isFileUploading.value = true;
 
-    isFileUploading.value = true
-
-    console.log('handlePrint', file.value)
+    console.log('handlePrint', file.value);
 
     var formData = new FormData();
-    console.log('file.value', file.value)
-    formData.append("sampleFile", file.value);
+    console.log('file.value', file.value);
+    formData.append('sampleFile', file.value);
     if (lordStore.db?.computerName) {
-      formData.append("addedBy", lordStore.db.computerName);
-      formData.append("addedTo", selectedComputerData.value?.computerName ?? '');
+      formData.append('addedBy', lordStore.db.computerName);
+      formData.append(
+        'addedTo',
+        selectedComputerData.value?.computerName ?? '',
+      );
     }
     if (selectedComputerData.value?.ip != undefined) {
-
       if (lordStore.db.ip != selectedComputerData.value.ip) {
-        axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        }).catch(e => e = !e)
+        axios
+          .post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          .catch((e) => (e = !e));
       }
 
-      axios.post(`http://${selectedComputerData.value.ip}:9457/api/v1/upload/`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }).then((response) => {
-        isFileUploaded.value = true;
-        uploadFiled.value = response.data
-        console.log('uploaded : ', response.data)
-        commandToPrint(response.data.filename)
-      }).catch(() => {
-        toast.error('Something went wrong...')
-        isFileUploaded.value = false;
-        console.log('Not uploaded')
-      })
+      axios
+        .post(
+          `http://${selectedComputerData.value.ip}:9457/api/v1/upload/`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          },
+        )
+        .then((response) => {
+          isFileUploaded.value = true;
+          uploadFiled.value = response.data;
+          console.log('uploaded : ', response.data);
+          commandToPrint(response.data.filename);
+        })
+        .catch(() => {
+          toast.error('Something went wrong...');
+          isFileUploaded.value = false;
+          console.log('Not uploaded');
+        });
     }
   } else {
-    toast.warning('No file selected.')
-    console.log('No file selected', file.value, size(file))
+    toast.warning('No file selected.');
+    console.log('No file selected', file.value, size(file));
   }
-
 }
 
 function handleCancel() {
-  isDialogOpen.value = false
+  isDialogOpen.value = false;
   if (fileInput.value?.value) {
-    fileInput.value.value = ''
+    fileInput.value.value = '';
   } else {
-    fileInput.value = null
+    fileInput.value = null;
   }
-  file.value = null
-  isFileUploading.value = false
-  isFileUploaded.value = false
-  uploadFiled.value = {}
-  pdfBuffer.value = ''
+  file.value = null;
+  isFileUploading.value = false;
+  isFileUploaded.value = false;
+  uploadFiled.value = {};
+  pdfBuffer.value = '';
 }
 
 function isRangeValidation() {
-
   let o = customPages.value || '';
-  let max = isNumber(pdfPages.value) ? pdfPages.value : 100
-  console.log(o.split(','))
+  let max = isNumber(pdfPages.value) ? pdfPages.value : 100;
+  console.log(o.split(','));
 
-  isRangeValid.value = typeof o == 'string'
-    && o.split(',').every(el => {
-
-      el = el.trim()
-      console.log('Every : ', el)
+  isRangeValid.value =
+    typeof o == 'string' &&
+    o.split(',').every((el) => {
+      el = el.trim();
+      console.log('Every : ', el);
 
       if (el.includes('-')) {
-        let range = el.split('-')
+        let range = el.split('-');
         // console.log('range : ',  el, +el[0] < +el[1], el.every(el => +el > 0 && +el <= max ) )
 
         // if (+range[0] > +range[1]) {
@@ -240,29 +297,30 @@ function isRangeValidation() {
         //   rangeErrorMessage.value = 'Range must be a number between 1 and ' + max + '.'
         // }
 
-        return +range[0] < +range[1] && range.every(el => +el > 0 && +el <= max)
+        return (
+          +range[0] < +range[1] && range.every((el) => +el > 0 && +el <= max)
+        );
       }
 
       if (isNumber(+el)) {
         // console.log('Number : ', +el > 0 && +el <= max)
-        return +el > 0 && +el <= max
+        return +el > 0 && +el <= max;
       }
 
       return false;
-
-    })
+    });
 }
 
 onMounted(async () => {
-
-
   if (lordStore.db.ConnectedPCs?.length == 1) {
-    selectedComputer.value = lordStore.db.ConnectedPCs[0]?.ip ? lordStore.db.ConnectedPCs[0]?.ip : ''
-    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.name ? lordStore.db.ConnectedPCs[0]?.printersDefault?.name : ''
+    selectedComputer.value = lordStore.db.ConnectedPCs[0]?.ip
+      ? lordStore.db.ConnectedPCs[0]?.ip
+      : '';
+    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.name
+      ? lordStore.db.ConnectedPCs[0]?.printersDefault?.name
+      : '';
   }
-
-})
-
+});
 </script>
 
 <template lang="pug">

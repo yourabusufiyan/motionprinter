@@ -1,27 +1,54 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount } from "vue";
-import { useRoute, useRouter } from "vue-router"
-import axios from "axios";
-import { useLordStore } from "@/stores/LordStore";
+import { ref, watch, onBeforeUnmount } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import axios from 'axios';
+import { useLordStore } from '@/stores/LordStore';
 import { v7 as uuidv7 } from 'uuid';
 import { ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron/renderer';
-import { cloneDeep, isEqual, isNull, isObject, toString, merge, last, find, unionBy, uniqBy, reduce } from 'lodash';
+import {
+  cloneDeep,
+  isEqual,
+  isNull,
+  isObject,
+  toString,
+  merge,
+  last,
+  find,
+  unionBy,
+  uniqBy,
+  reduce,
+} from 'lodash';
 import path from 'path';
 import { shell } from 'electron';
 
 // Type imports
-import type { $cardMaker, $cardMakerPDF } from '@/declarations/index'
+import type { $cardMaker, $cardMakerPDF } from '@/declarations/index';
 
 // Components
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Skeleton } from '@/components/ui/skeleton'
-import { RocketIcon } from '@radix-icons/vue'
-import { Loader2, RotateCcw, FileText, Download, Plus, Trash2, IdCard, Printer } from 'lucide-vue-next'
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RocketIcon } from '@radix-icons/vue';
+import {
+  Loader2,
+  RotateCcw,
+  FileText,
+  Download,
+  Plus,
+  Trash2,
+  IdCard,
+  Printer,
+} from 'lucide-vue-next';
 
 interface RepeaterItem {
   id: string;
@@ -46,69 +73,81 @@ const isProcessing = ref(false);
 const isDataToProcess = ref(false);
 const isChangedAfterCreatingPDF = ref(false);
 
-const options = ref([
-  { label: "Custom Card", value: "custom" },
-  { label: "E-Shram Card", value: "eshram" },
-  { label: "Abha Card", value: "abha" },
-  { label: "Aadhaar Card", value: "aadhaar" },
-  { label: "Ayushman Card", value: "ayushman" },
-  { label: "Pan Card", value: "pan" },
-].sort((a, b) => {
-  if (b.value == 'custom') return 1;
-  return a.label.localeCompare(b.label)
-}));
+const options = ref(
+  [
+    { label: 'Custom Card', value: 'custom' },
+    { label: 'E-Shram Card', value: 'eshram' },
+    { label: 'Abha Card', value: 'abha' },
+    { label: 'Aadhaar Card', value: 'aadhaar' },
+    { label: 'Ayushman Card', value: 'ayushman' },
+    { label: 'Pan Card', value: 'pan' },
+  ].sort((a, b) => {
+    if (b.value == 'custom') return 1;
+    return a.label.localeCompare(b.label);
+  }),
+);
 const providers = ref([
-  { label: "UTI/ITSL", value: "uti" },
+  { label: 'UTI/ITSL', value: 'uti' },
+  { label: 'NSDL', value: 'nsdl' },
 ]);
-
-
 
 function createNewRepeaterItem(): RepeaterItem {
   return {
     id: uuidv7(),
     cardType: null,
-    file: null
+    file: null,
   };
 }
 
 function saveToMain() {
-  console.log(lordStore.lowdb.data)
+  console.log(lordStore.lowdb.data);
   isChangedAfterCreatingPDF.value = true;
   let data = lordStore.db.cardMaker.map((el: $cardMaker, i: number) => {
     if (el.id === page.value?.id) {
       if (page.value?.pdfs) {
-        page.value.pdfs = page.value?.pdfs?.filter((pdf: $cardMakerPDF) => isObject(pdf));
+        page.value.pdfs = page.value?.pdfs?.filter((pdf: $cardMakerPDF) =>
+          isObject(pdf),
+        );
       }
-      el = merge(el, page.value)
+      el = merge(el, page.value);
     }
     return el;
   });
-  console.log("last page: ", last(data))
+  console.log('last page: ', last(data));
   lordStore.lowdb.data = lordStore.db;
-  lordStore.saveLowDB()
+  lordStore.saveLowDB();
 }
 
 const addRepeaterField = () => repeater.value.push(createNewRepeaterItem());
 const removeRepeaterField = (index: number) => {
   if (page.value?.pdfs) {
-    page.value.pdfs = page.value?.pdfs?.filter((el: $cardMakerPDF) => el?.id != repeater.value[index]?.id);
+    page.value.pdfs = page.value?.pdfs?.filter(
+      (el: $cardMakerPDF) => el?.id != repeater.value[index]?.id,
+    );
   }
-  repeater.value.splice(index, 1)
+  repeater.value.splice(index, 1);
   saveToMain();
 };
-const handlePasswordChange = async (event: Event, index: number, card: $cardMakerPDF) => {
-  if (page.value?.pdfs?.length && page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)) {
+const handlePasswordChange = async (
+  event: Event,
+  index: number,
+  card: $cardMakerPDF,
+) => {
+  if (
+    page.value?.pdfs?.length &&
+    page.value?.pdfs?.some((el: $cardMakerPDF) => el?.id === card.id)
+  ) {
     page.value.pdfs[index].password = toString(repeater.value[index].password);
-    message.value = 'Card processing in high quality. Please wait...'
+    message.value = 'Card processing in high quality. Please wait...';
     isProcessing.value = true;
     ipcRenderer.send('cardMaker', cloneDeep(page.value));
   }
-}
+};
 
 const handleFileUpload = async (event: Event, index: number) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
-  let card = repeater.value[index]
+  let card = repeater.value[index];
   const password = card?.password;
 
   if (!file) return;
@@ -123,88 +162,100 @@ const handleFileUpload = async (event: Event, index: number) => {
   isProcessing.value = true;
 
   const formData = new FormData();
-  formData.append("sampleFile", file);
-  formData.append("cardMaker", 'true');
-  formData.append("index", index?.toString());
-  formData.append("cardType", repeater.value[index].cardType?.toString() || '');
-  formData.append("id", repeater.value[index].id.toString());
-  formData.append("password", repeater.value[index]?.password?.toString() || '');
-  formData.append("addedBy", lordStore.db.computerName || '');
+  formData.append('sampleFile', file);
+  formData.append('cardMaker', 'true');
+  formData.append('index', index?.toString());
+  formData.append('cardType', repeater.value[index].cardType?.toString() || '');
+  formData.append('id', repeater.value[index].id.toString());
+  formData.append(
+    'password',
+    repeater.value[index]?.password?.toString() || '',
+  );
+  formData.append('addedBy', lordStore.db.computerName || '');
 
-  if (repeater.value[index].cardType == 'pan' && repeater.value[index].provider) {
-    formData.append("provider", repeater.value[index].provider.toString() as string);
+  if (
+    repeater.value[index].cardType == 'pan' &&
+    repeater.value[index].provider
+  ) {
+    formData.append(
+      'provider',
+      repeater.value[index].provider.toString() as string,
+    );
   }
 
   if (repeater.value[index].cardType?.toString() == 'custom') {
     if (target.id == 'card-front') {
-      formData.append("cardFront", 'true');
+      formData.append('cardFront', 'true');
     } else if (target.id == 'card-back') {
-      formData.append("cardBack", "true");
+      formData.append('cardBack', 'true');
     }
   }
 
   if (page.value?.id) {
-    formData.append("makerID", page.value.id);
+    formData.append('makerID', page.value.id);
   }
 
-  console.log('going to make a upload request')
+  console.log('going to make a upload request');
 
   try {
     const response = await axios.post(
       `http://${lordStore.db.ip}:9457/api/v1/upload/`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
-    message.value = "File uploaded successfully!";
+    message.value = 'File uploaded successfully!';
 
-    console.log(response.data)
+    console.log(response.data);
 
     if (response?.data?.pdfs?.length && !isEqual(page.value, response.data)) {
-      message.value = 'Card processing. Please wait...'
+      message.value = 'Card processing. Please wait...';
       ipcRenderer.send('cardMaker', cloneDeep(response.data));
     }
 
     if (response?.data?.pdfs?.length && page.value?.pdfs?.length) {
-
       page.value = response.data as $cardMaker;
 
-      let temp = cloneDeep(response.data?.pdfs)
-      page.value.pdfs = []
+      let temp = cloneDeep(response.data?.pdfs);
+      page.value.pdfs = [];
       repeater.value.filter((el, i) => {
         if (page.value?.pdfs?.length) {
-          page.value.pdfs.push(find(temp, ['id', el.id]))
+          page.value.pdfs.push(find(temp, ['id', el.id]));
         }
-      })
-
+      });
     }
-
-
   } catch (error) {
     repeater.value[index].file = null;
     message.value = axios.isAxiosError(error)
-      ? error.response?.data.message || "Upload failed"
-      : "An error occurred while uploading the file.";
-    console.error("Upload error:", error);
+      ? error.response?.data.message || 'Upload failed'
+      : 'An error occurred while uploading the file.';
+    console.error('Upload error:', error);
     isProcessing.value = false;
   }
 };
 
 const resetFields = () => {
   repeater.value = [createNewRepeaterItem()];
-  message.value = ''
-  messageFile.value = ''
-  messageWarning.value = ''
-  messageWarningFile.value = ''
-  isProcessing.value = false
-  isDataToProcess.value = false
+  message.value = '';
+  messageFile.value = '';
+  messageWarning.value = '';
+  messageWarningFile.value = '';
+  isProcessing.value = false;
+  isDataToProcess.value = false;
 };
 
 // IPC Event Handlers
 const ipcHandlers = {
-  'cardMaker-failure': (event: IpcRendererEvent, response: { page: $cardMaker; card: $cardMakerPDF }) => {
+  'cardMaker-failure': (
+    event: IpcRendererEvent,
+    response: { page: $cardMaker; card: $cardMakerPDF },
+  ) => {
     message.value = response.card.errorMessage || 'PDF conversion failed';
-    if (response.card?.cardType == 'aadhaar' && !response.card.password?.length && response.card?.errorMessage?.length) {
-      message.value = 'Please enter the password for the Aadhaar card';
+    if (
+      ['aadhaar', 'pan'].includes(response.card?.cardType as string) &&
+      !response.card.password?.length &&
+      response.card?.errorMessage?.length
+    ) {
+      message.value = `Please enter the password for the ${response.card.cardType} card`;
     }
     messageFile.value = response.card.originalName || '';
     page.value = merge(page.value, response.page);
@@ -213,20 +264,28 @@ const ipcHandlers = {
   'cardMaker-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
     message.value = `Card converted successfully`;
     page.value = merge(page.value, returnPage);
-    saveToMain()
+    saveToMain();
   },
-  'cardMaker-image-extracted-failure': (event: IpcRendererEvent, { file, card }: { file: $cardMaker; card: $cardMakerPDF }) => {
+  'cardMaker-image-extracted-failure': (
+    event: IpcRendererEvent,
+    { file, card }: { file: $cardMaker; card: $cardMakerPDF },
+  ) => {
     message.value = `Image extraction failed`;
     messageFile.value = card.originalName || '';
     isProcessing.value = false;
   },
-  'cardMaker-image-extracted-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+  'cardMaker-image-extracted-success': (
+    event: IpcRendererEvent,
+    returnPage: $cardMaker,
+  ) => {
     message.value = `Image extracted successfully`;
-    page.value = merge(page.value, returnPage);;
-    saveToMain()
-    console.log(returnPage)
+    page.value = merge(page.value, returnPage);
+    saveToMain();
+    console.log(returnPage);
 
-    const warning = returnPage.pdfs?.find((el: $cardMakerPDF) => el?.warningMessage);
+    const warning = returnPage.pdfs?.find(
+      (el: $cardMakerPDF) => el?.warningMessage,
+    );
     if (warning) {
       messageWarning.value = warning.warningMessage || '';
       messageWarningFile.value = warning.originalName || '';
@@ -236,18 +295,24 @@ const ipcHandlers = {
       ipcRenderer.send('cardMaker', cloneDeep(page.value));
     }
   },
-  'cardMakerCreatePDF-failure': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+  'cardMakerCreatePDF-failure': (
+    event: IpcRendererEvent,
+    returnPage: $cardMaker,
+  ) => {
     message.value = `PDF creation failed`;
     page.value = merge(page.value, returnPage);
     isProcessing.value = false;
   },
-  'cardMakerCreatePDF-success': (event: IpcRendererEvent, returnPage: $cardMaker) => {
+  'cardMakerCreatePDF-success': (
+    event: IpcRendererEvent,
+    returnPage: $cardMaker,
+  ) => {
     message.value = `PDF created successfully. You can download the PDF free!`;
     messageFile.value = returnPage.filename || '';
     page.value = merge(page.value, returnPage);
-    saveToMain()
+    saveToMain();
     isProcessing.value = false;
-  }
+  },
 };
 
 // Register IPC listeners
@@ -257,7 +322,7 @@ Object.entries(ipcHandlers).forEach(([event, handler]) => {
 
 // Cleanup listeners
 onBeforeUnmount(() => {
-  Object.keys(ipcHandlers).forEach(event => {
+  Object.keys(ipcHandlers).forEach((event) => {
     ipcRenderer.removeAllListeners(event);
   });
 });
@@ -267,29 +332,31 @@ const onDownload = () => {
 
   const file = {
     destination: page.value.outputFile,
-    originalName: path.basename(page.value.outputFile)
+    originalName: path.basename(page.value.outputFile),
   };
 
   try {
     ipcRenderer.send('download-file', cloneDeep(file));
   } catch (error) {
-    console.error("Download failed:", error);
+    console.error('Download failed:', error);
   }
 };
 
 const onSelectChange = (value: string, index: number) => {
   if (page.value?.pdfs?.length) {
-    page.value.pdfs = page.value?.pdfs?.filter((el: $cardMakerPDF) => el?.id != repeater.value[index]?.id);
+    page.value.pdfs = page.value?.pdfs?.filter(
+      (el: $cardMakerPDF) => el?.id != repeater.value[index]?.id,
+    );
     repeater.value[index].file = null;
-    saveToMain()
+    saveToMain();
   }
   repeater.value[index].cardType = value as 'abha' | 'eshrem';
 };
 
 const onCreate = () => {
   if (page.value?.pdfs?.length) {
-    message.value = "Please wait while creating PDF...";
-    messageFile.value = ''
+    message.value = 'Please wait while creating PDF...';
+    messageFile.value = '';
     isProcessing.value = true;
     isDataToProcess.value = false;
     ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value));
@@ -297,29 +364,30 @@ const onCreate = () => {
 };
 
 const onPrint = async () => {
-  ipcRenderer.send('printFile', { path: page.value?.outputFile?.toString(), options: { printDialog: true } })
+  ipcRenderer.send('printFile', {
+    path: page.value?.outputFile?.toString(),
+    options: { printDialog: true },
+  });
 };
 
 const onMakeNewPDF = async () => {
   repeater.value = [createNewRepeaterItem()];
-  page.value = null
-  message.value = ''
-  messageFile.value = ''
-  messageWarning.value = ''
-  messageWarningFile.value = ''
-  isProcessing.value = false
-  isDataToProcess.value = false
+  page.value = null;
+  message.value = '';
+  messageFile.value = '';
+  messageWarning.value = '';
+  messageWarningFile.value = '';
+  isProcessing.value = false;
+  isDataToProcess.value = false;
 };
 
 const disabledUploadFile = (field: RepeaterItem) => {
-
   if (!field.cardType) return true;
 
   if (field.cardType === 'pan' && !field.provider) return true;
 
   return false;
 };
-
 </script>
 
 <template lang="pug">
@@ -367,7 +435,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
               :value="provider.value"
             ) {{ provider.label }}
 
-      .password-container.w-40.place-self-end(v-if="field.cardType === 'aadhaar'")
+      .password-container.w-40.place-self-end(v-if="['aadhaar', 'pan'].includes(field.cardType)")
         Input(
           v-model="field.password"
           @change="(e: Event) => handlePasswordChange(e, index, field)"
@@ -489,8 +557,8 @@ const disabledUploadFile = (field: RepeaterItem) => {
 </template>
 
 <style lang="stylus" scoped>
-.card-container 
+.card-container
   & .card-front > .w-full, & .card-back > .w-full {
     aspect-ratio: 1011/638;
-  } 
+  }
 </style>

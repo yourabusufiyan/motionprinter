@@ -15,18 +15,18 @@ const routes: RouteRecordRaw[] = [
     path: '/home',
     name: 'home',
     component: () => import('../views/HomePage.vue'),
-    meta: { title: 'Home' }
+    meta: { title: 'Home' },
   },
   {
     path: '/inbox',
     name: 'inbox',
     component: () => import('../views/inboxPage.vue'),
-    meta: { title: 'Inbox' }
+    meta: { title: 'Inbox' },
   },
   {
     path: '/card-maker',
     name: 'card-maker',
-    children: CardMakerRoutes
+    children: CardMakerRoutes,
   },
   {
     path: '/photosheet-maker',
@@ -37,19 +37,19 @@ const routes: RouteRecordRaw[] = [
     path: '/connected-pc',
     name: 'connected-pc',
     component: () => import('../views/ConnectedPC.vue'),
-    meta: { title: 'Connected PC' }
+    meta: { title: 'Connected PC' },
   },
   {
     path: '/history',
     name: 'history',
     component: () => import('../views/HistoryPage.vue'),
-    meta: { title: 'History' }
+    meta: { title: 'History' },
   },
   {
     path: '/help',
     name: 'help',
     component: () => import('../views/HelpPage.vue'),
-    meta: { title: 'Help & Supports' }
+    meta: { title: 'Help & Supports' },
   },
   {
     path: '/settings',
@@ -66,23 +66,22 @@ const router = createRouter({
       return savedPosition;
     }
     if (to.hash) {
-      return { el: to.hash, behavior: "smooth" };
+      return { el: to.hash, behavior: 'smooth' };
     } else {
-      console.log("moving to top of the page");
+      console.log('moving to top of the page');
       window.scrollTo(0, 0);
     }
-  }
+  },
 });
 
 router.beforeEach(async (to, from, next) => {
-  const store = useLordStore()
-  await store.reloadDatabase()
+  const store = useLordStore();
+  await store.reloadDatabase();
   if (to.hash) {
-    document.querySelector(to.hash)?.scrollIntoView()
+    document.querySelector(to.hash)?.scrollIntoView();
   }
-  next()
+  next();
 });
-
 
 export default router;
 console.log('[App.vue]', `router ended`);

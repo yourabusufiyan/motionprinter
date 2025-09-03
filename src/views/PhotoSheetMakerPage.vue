@@ -1,7 +1,6 @@
 <script lang="ts" setup>
-
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label'
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -17,14 +16,19 @@ import {
   NumberFieldDecrement,
   NumberFieldIncrement,
   NumberFieldInput,
-} from '@/components/ui/number-field'
-import PhotoItem from './PhotoItem.vue'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Skeleton } from '@/components/ui/skeleton'
+} from '@/components/ui/number-field';
+import PhotoItem from './PhotoItem.vue';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-import { Loader2 } from 'lucide-vue-next'
-import axios from 'axios'
+import { Loader2 } from 'lucide-vue-next';
+import axios from 'axios';
 import { ipcRenderer } from 'electron';
 import { cloneDeep, isNull, isUndefined, merge } from 'lodash';
 import { useLordStore } from '@/stores/LordStore';
@@ -38,23 +42,23 @@ const lordStore = useLordStore();
 const currentPage = ref<$photoSheet>({
   id: uuidv7().split('-').slice(0, 3).join(''),
   photos: [],
-})
-const pages = ref<$photoSheet[]>([{ id: '', photos: [] }])
-const currentPageIndex = ref(0)
-const selectedGrid = ref('6x7')
-const selectedPaperSize = ref('a4')
-const pageMargin = ref(5)
-const cellWidth = ref(50)
-const cellHeight = ref(50)
-const cellGap = ref(5)
-const cellBorder = ref(1)
-const cellBorderColor = ref("rgb(0, 0, 0)")
-const paperZoom = ref(1)
-const isRotating = ref(false)
-const rotationStartAngle = ref(0)
-const initialRotation = ref(0)
-const selectedCellIndex = ref<number | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
+});
+const pages = ref<$photoSheet[]>([{ id: '', photos: [] }]);
+const currentPageIndex = ref(0);
+const selectedGrid = ref('6x7');
+const selectedPaperSize = ref('a4');
+const pageMargin = ref(5);
+const cellWidth = ref(50);
+const cellHeight = ref(50);
+const cellGap = ref(5);
+const cellBorder = ref(1);
+const cellBorderColor = ref('rgb(0, 0, 0)');
+const paperZoom = ref(1);
+const isRotating = ref(false);
+const rotationStartAngle = ref(0);
+const initialRotation = ref(0);
+const selectedCellIndex = ref<number | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
 const pdfContent = ref<HTMLElement | null>(null);
 const isPrinting = ref(false);
 const isPdfDownloading = ref(false);
@@ -73,42 +77,43 @@ const gridLayouts = [
   { label: '30 Photos(6x5)', value: '6x5' },
   { label: '36 Photos', value: '6x6' },
   { label: '42 Photos', value: '6x7' },
-]
+];
 
 const paperSizes = [
   { name: 'A4', value: 'a4', width: 210, height: 297 },
   { name: 'Letter', value: 'letter', width: 216, height: 279 },
-]
+];
 
 // Computed properties
-const paperSize = computed(() => paperSizes.find((s) => s.value === selectedPaperSize.value)!)
+const paperSize = computed(
+  () => paperSizes.find((s) => s.value === selectedPaperSize.value)!,
+);
 const gridCells = computed(() => {
-  return gridCellsFunc(selectedGrid.value)
-})
+  return gridCellsFunc(selectedGrid.value);
+});
 const gridStyle = computed(() => {
   const isCustom = selectedGrid.value == 'custom';
   return {
     ...gridStyleFunc(selectedGrid.value, cellGap.value.toString() + 'mm'),
     ...{
       padding: `${pageMargin.value}mm`,
-    }
-  }
+    },
+  };
 });
 const paperStyle = computed(() => ({
   transform: `scale(${paperZoom.value})`,
   transformOrigin: 'center center',
   width: `${paperSize.value.width}mm`,
   height: `${paperSize.value.height}mm`,
-}))
-const isInAction = computed(() => isPrinting.value || isPdfDownloading.value)
-
+}));
+const isInAction = computed(() => isPrinting.value || isPdfDownloading.value);
 
 // Methods
 
 function gridCellsFunc(val: string) {
-  const [cols, rows] = val.split('x').map(Number)
+  const [cols, rows] = val.split('x').map(Number);
   const isCustom = selectedGrid.value == 'custom';
-  return cols * rows
+  return cols * rows;
 }
 
 function gridStyleFunc(val: string, gap: string = '5mm') {
@@ -116,29 +121,26 @@ function gridStyleFunc(val: string, gap: string = '5mm') {
   return {
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
     gridTemplateRows: `repeat(${rows}, 1fr)`,
-    gap
-  }
+    gap,
+  };
 }
 
 const handlePaperZoom = (e: WheelEvent) => {
   if (e.ctrlKey) {
-    e.preventDefault()
-    paperZoom.value *= e.deltaY > 0 ? 0.95 : 1.05
-    paperZoom.value = Math.min(Math.max(0.5, paperZoom.value), 3)
+    e.preventDefault();
+    paperZoom.value *= e.deltaY > 0 ? 0.95 : 1.05;
+    paperZoom.value = Math.min(Math.max(0.5, paperZoom.value), 3);
   }
-
-}
+};
 
 const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
-  e.stopPropagation()
+  e.stopPropagation();
   if (copy && e.altKey && currentPage.value.photos[index]) {
-
     let arr = currentPage.value.photos;
     let totalGrid = gridCells.value;
     let i = index;
 
-    if (totalGrid == (i + 1)) return;
-
+    if (totalGrid == i + 1) return;
 
     let nextFilled = -1;
     for (let j = i + 1; j <= totalGrid; j++) {
@@ -148,7 +150,7 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
       }
       if (j >= arr.length) {
         if (!arr[j]) {
-          nextFilled = j
+          nextFilled = j;
           break;
         } else if (arr[i]?.id == arr[j]?.id) {
           continue;
@@ -159,63 +161,59 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
     if (nextFilled > 0) {
       for (let k = i + 1; k <= nextFilled; k++) {
         if (k == nextFilled) {
-          arr.splice(i, 0, arr[i])
+          arr.splice(i, 0, arr[i]);
           break;
         }
 
         if (!arr[k]) {
-          arr.splice(k, 1, arr[i])
+          arr.splice(k, 1, arr[i]);
           break;
         }
       }
     }
 
     if (arr.length > totalGrid) arr.splice(totalGrid);
-
   } else if (!copy) {
-    selectedCellIndex.value = index
-    fileInput.value?.click()
+    selectedCellIndex.value = index;
+    fileInput.value?.click();
   }
-}
-
-
+};
 
 const addNewPage = () => {
-  pages.value.push({ id: '', photos: [] })
-  currentPageIndex.value = pages.value.length - 1
-}
+  pages.value.push({ id: '', photos: [] });
+  currentPageIndex.value = pages.value.length - 1;
+};
 
 const removeCurrentPage = () => {
   if (pages.value.length > 1) {
-    pages.value.splice(currentPageIndex.value, 1)
-    currentPageIndex.value = Math.max(0, currentPageIndex.value - 1)
+    pages.value.splice(currentPageIndex.value, 1);
+    currentPageIndex.value = Math.max(0, currentPageIndex.value - 1);
   }
-}
+};
 
 const findNextEmptyCell = (startIndex: number) => {
   for (let i = startIndex + 1; i < gridCells.value; i++) {
-    if (!currentPage.value.photos[i]) return i
+    if (!currentPage.value.photos[i]) return i;
   }
-  return -1
-}
+  return -1;
+};
 
 const removePhoto = (pageIndex: number, photoIndex: number) => {
-  currentPage.value.photos.splice(photoIndex, 1)
-}
+  currentPage.value.photos.splice(photoIndex, 1);
+};
 
 const removeEmptyCell = () => {
-  currentPage.value.photos = Object.values(currentPage.value.photos)
-}
+  currentPage.value.photos = Object.values(currentPage.value.photos);
+};
 
 const handleFileSelect = async (e: Event) => {
-  const files = (e.target as HTMLInputElement).files
-  if (!files || files.length === 0) return
+  const files = (e.target as HTMLInputElement).files;
+  if (!files || files.length === 0) return;
 
-  const isSingle = files.length === 1
+  const isSingle = files.length === 1;
   for (let i = 0; i < files.length; i++) {
-
-    const file = files[i]
-    const reader = new FileReader()
+    const file = files[i];
+    const reader = new FileReader();
     let o: $photoSheetPhoto = {
       src: '',
       zoom: 1,
@@ -227,7 +225,6 @@ const handleFileSelect = async (e: Event) => {
     let index: number = selectedCellIndex.value as number;
 
     reader.onload = (event) => {
-
       var image = new Image();
       image.src = reader.result as string;
       image.onload = function () {
@@ -235,20 +232,19 @@ const handleFileSelect = async (e: Event) => {
         o.width = image.width;
         o.height = image.height;
       };
-
-    }
-    reader.readAsDataURL(file)
+    };
+    reader.readAsDataURL(file);
 
     const formData = new FormData();
-    formData.append("sampleFile", file);
-    formData.append("temp", 'true');
-    formData.append("addedBy", lordStore.db.computerName || '');
+    formData.append('sampleFile', file);
+    formData.append('temp', 'true');
+    formData.append('addedBy', lordStore.db.computerName || '');
 
     try {
       const response = await axios.post(
         `http://${lordStore.db.ip}:9457/api/v1/upload/`,
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        { headers: { 'Content-Type': 'multipart/form-data' } },
       );
 
       let res: $photoSheetPhoto = response.data;
@@ -257,35 +253,31 @@ const handleFileSelect = async (e: Event) => {
       o = {
         ...o,
         ...response.data,
-        ...{ src: `http://localhost:9457/temp/${response.data.filename}` }
+        ...{ src: `http://localhost:9457/temp/${response.data.filename}` },
       };
 
       if (isSingle) {
-        currentPage.value.photos[index as number] = o
+        currentPage.value.photos[index as number] = o;
       } else {
-        index = selectedCellIndex.value as number + 1 + i;
-        currentPage.value.photos.splice(index, 0, o)
+        index = (selectedCellIndex.value as number) + 1 + i;
+        currentPage.value.photos.splice(index, 0, o);
       }
-
     } catch (error) {
       let message = axios.isAxiosError(error)
-        ? error.response?.data.message || "Upload failed"
-        : "An error occurred while uploading the file.";
-      console.error("Upload error:", error);
+        ? error.response?.data.message || 'Upload failed'
+        : 'An error occurred while uploading the file.';
+      console.error('Upload error:', error);
     }
-
   }
 
   if (fileInput.value) {
-    fileInput.value.value = ''
+    fileInput.value.value = '';
   }
-
-
-}
+};
 
 const CellRefs = ref<(HTMLElement | null)[]>([]);
-const CellWidth = ref<number>(0)
-const CellHeight = ref<number>(0)
+const CellWidth = ref<number>(0);
+const CellHeight = ref<number>(0);
 let resizeObserver: ResizeObserver | null = null;
 
 const setCellRef = (el: HTMLElement | null, index: number) => {
@@ -299,17 +291,17 @@ const updateDimensions = () => {
   }
 };
 
-
 const doAction = async (printPDF: boolean = false) => {
-
   if (!pdfContent.value) {
     console.error('Element not found', pdfContent.value);
     return;
-  };
+  }
 
   const head = `
     <title>MP Photosheet - ${currentPage.value.id}</title>
-    ${Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML).join('\n')}
+    ${Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((el) => el.outerHTML)
+      .join('\n')}
     <style>
       @media print {
         body { margin, padding, border: 0; }
@@ -329,8 +321,8 @@ const doAction = async (printPDF: boolean = false) => {
 
   console.log('printPDF', printPDF);
 
-  isPdfDownloading.value = printPDF
-  isPrinting.value = !printPDF
+  isPdfDownloading.value = printPDF;
+  isPrinting.value = !printPDF;
 
   let obj = {
     head,
@@ -338,16 +330,15 @@ const doAction = async (printPDF: boolean = false) => {
     printPDF: printPDF,
     isPrint: !printPDF,
     filename: `mp-photosheet-${currentPage.value.id}.pdf`,
-  }
+  };
 
   ipcRenderer.send('generate-pdf', obj);
-
 };
 
-
 onMounted(() => {
-
-  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]')).map(el => el.outerHTML)
+  const styles = Array.from(
+    document.querySelectorAll('style, link[rel="stylesheet"]'),
+  ).map((el) => el.outerHTML);
   console.log('all style tag in head ', styles);
 
   updateDimensions();
@@ -365,7 +356,6 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   isPdfDownloading.value = false;
   isPrinting.value = false;
 });
-
 </script>
 
 <template lang="pug">
@@ -528,7 +518,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
 .paper-container
   background-color #f3f4f6
   min-height calc(100vh - 111px)
-  
+
 .controls
   margin-bottom 2rem
 
@@ -542,7 +532,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   height 100%
   gap 2mm
 
-.grid-cell 
+.grid-cell
   position relative
   overflow hidden
   border 1px solid #000

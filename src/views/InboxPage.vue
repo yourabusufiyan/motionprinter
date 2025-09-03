@@ -1,69 +1,75 @@
 <script setup>
-import { initDropdowns } from 'flowbite'
-import { Button as uiButton } from '@/components/ui/button'
-import { Textarea as uiTextarea } from '@/components/ui/textarea'
+import { initDropdowns } from 'flowbite';
+import { Button as uiButton } from '@/components/ui/button';
+import { Textarea as uiTextarea } from '@/components/ui/textarea';
 
-import { onMounted, toRefs, ref, reactive } from 'vue'
-import ip from 'ip'
-import axios from 'axios'
-import moment from 'moment'
-import { uniq, isNumber } from 'lodash'
-import { useLordStore } from '@/stores/LordStore'
+import { onMounted, toRefs, ref, reactive } from 'vue';
+import ip from 'ip';
+import axios from 'axios';
+import moment from 'moment';
+import { uniq, isNumber } from 'lodash';
+import { useLordStore } from '@/stores/LordStore';
 
 const lordStore = useLordStore();
-let inboxes = ref()
-let currentInbox = ref()
-let onlineUsers = ref([])
+let inboxes = ref();
+let currentInbox = ref();
+let onlineUsers = ref([]);
 let intervalId = ref(null);
 
 function checkOnlinePCs() {
   if (inboxes.value?.length) {
-    inboxes.value.forEach(el => {
-      axios.get(`http://${el.ip}:9457/api/v1/ping`, { timeout: 50 }).then((response) => {
-        onlineUsers.value = onlineUsers.value.concat(el.id)
-      }).catch((e) => { })
+    inboxes.value.forEach((el) => {
+      axios
+        .get(`http://${el.ip}:9457/api/v1/ping`, { timeout: 50 })
+        .then((response) => {
+          onlineUsers.value = onlineUsers.value.concat(el.id);
+        })
+        .catch((e) => {});
       return true;
-    })
+    });
   }
-  onlineUsers.value = uniq(onlineUsers.value)
+  onlineUsers.value = uniq(onlineUsers.value);
 }
 
 onMounted(() => {
-  initDropdowns()
+  initDropdowns();
   intervalId = setInterval(checkOnlinePCs, 5000);
-})
+});
 
-axios.get(`http://${ip.address()}:9457/api/v1/inbox`).then((response) => {
-  console.log('inbox response', response.data);
-  response.data.sort((a) => ip.address() == a.ip ? -1 : 1)
-  inboxes.value = response.data
-  checkOnlinePCs()
-}).catch(() => {
-  console.log('inbox response error');
-})
-
+axios
+  .get(`http://${ip.address()}:9457/api/v1/inbox`)
+  .then((response) => {
+    console.log('inbox response', response.data);
+    response.data.sort((a) => (ip.address() == a.ip ? -1 : 1));
+    inboxes.value = response.data;
+    checkOnlinePCs();
+  })
+  .catch(() => {
+    console.log('inbox response error');
+  });
 
 let messageWriter = ref('');
 function sendMessage() {
-  console.log(currentInbox.value)
-  axios.post(`http://${currentInbox.value.ip}:9457/api/v1/inbox/message`, {
-    chatId: currentInbox.value.id,
-    senderId: lordStore.db.id,
-    message: messageWriter.value.toString(),
-    MessageType: 'text',
-    sentAt: Date.now(),
-    senderComputerName: lordStore.db.computerName,
-    senderIP: lordStore.db.ip,
-  })
+  console.log(currentInbox.value);
+  axios
+    .post(`http://${currentInbox.value.ip}:9457/api/v1/inbox/message`, {
+      chatId: currentInbox.value.id,
+      senderId: lordStore.db.id,
+      message: messageWriter.value.toString(),
+      MessageType: 'text',
+      sentAt: Date.now(),
+      senderComputerName: lordStore.db.computerName,
+      senderIP: lordStore.db.ip,
+    })
     .then(function (response) {
       console.log(response);
-      inboxes.value = inboxes.value.map(el => {
+      inboxes.value = inboxes.value.map((el) => {
         if (el.id === response.data.id) {
           currentInbox.value.messages = response.data.messages;
-          el.messages = response.data.messages
+          el.messages = response.data.messages;
         }
-        return el
-      })
+        return el;
+      });
       messageWriter.value = 'success';
     })
     .catch(function (error) {
@@ -75,7 +81,6 @@ function sendMessage() {
 onUnmounted(() => {
   clearInterval(intervalId);
 });
-
 </script>
 
 <template lang="pug">
@@ -148,7 +153,6 @@ onUnmounted(() => {
           .message-sender
             uiButton( @click="sendMessage" ) send
 </template>
-
 
 <style lang="stylus" scoped>
 .user-list-container > ul > li

@@ -1,61 +1,61 @@
 <script setup lang="ts">
 //import libraries
-import { ReloadIcon } from '@radix-icons/vue'
-
+import { ReloadIcon } from '@radix-icons/vue';
 
 // import the Type
 import type { Printer, localPrinter } from '../declarations/PrintersList';
-import type { connectedPC } from './../declarations/LordStore.d'
+import type { connectedPC } from './../declarations/LordStore.d';
 
 // Vue and its dependencies
 import { ref, toDisplayString } from 'vue';
 import { useLordStore } from '../stores/LordStore';
-import ip, { address } from 'ip'
-import axios from 'axios'
-import { last, uniq, orderBy } from 'lodash'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './../components/ui/accordion'
+import ip, { address } from 'ip';
+import axios from 'axios';
+import { last, uniq, orderBy } from 'lodash';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from './../components/ui/accordion';
 import { Button as uiButton } from '../components/ui/button';
 
-
-const lordStore = useLordStore()
-const refreshed = ref(false)
-const numbersToRefresh = ref(10)
-const initialVisit = ref(true)
-const connectedPCs = ref<Array<connectedPC>>([])
-const connectedPCSearching = ref(false)
-const defaultAccordion = ref('')
+const lordStore = useLordStore();
+const refreshed = ref(false);
+const numbersToRefresh = ref(10);
+const initialVisit = ref(true);
+const connectedPCs = ref<Array<connectedPC>>([]);
+const connectedPCSearching = ref(false);
+const defaultAccordion = ref('');
 
 async function loadComputers(force: boolean = false) {
-
   if (connectedPCSearching.value) return;
 
   if (force) {
-    connectedPCs.value = []
-    refreshed.value = true
-    if ((!initialVisit.value) && refreshed.value) {
+    connectedPCs.value = [];
+    refreshed.value = true;
+    if (!initialVisit.value && refreshed.value) {
       numbersToRefresh.value = +numbersToRefresh.value + 5;
     }
   }
-
 
   connectedPCSearching.value = true;
   const params = new URLSearchParams({
     force: force ? 'yes' : 'no',
     numbersToRefresh: toDisplayString(numbersToRefresh.value),
   });
-  const getConnectedPCs = await axios.get(`http://${ip.address()}:9457/api/v1/connected-pc?${params.toString()}`)
-  console.log(getConnectedPCs)
-  getConnectedPCs?.data?.sort((a: connectedPC) => a.ip == lordStore.db.ip ? -1 : 1)
-  connectedPCs.value = getConnectedPCs?.data
+  const getConnectedPCs = await axios.get(
+    `http://${ip.address()}:9457/api/v1/connected-pc?${params.toString()}`,
+  );
+  console.log(getConnectedPCs);
+  getConnectedPCs?.data?.sort((a: connectedPC) =>
+    a.ip == lordStore.db.ip ? -1 : 1,
+  );
+  connectedPCs.value = getConnectedPCs?.data;
   connectedPCSearching.value = false;
   initialVisit.value = false;
-
 }
-
-
-
 </script>
-
 
 <template lang="pug">
   .container.w-100.py-8

@@ -1,9 +1,14 @@
 <script lang="ts" setup>
-import { watch } from 'vue'
+import { watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useLordStore } from '../stores/LordStore';
-import ip from 'ip'
-import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatBubbleIcon } from '@radix-icons/vue'
+import ip from 'ip';
+import {
+  HomeIcon,
+  CountdownTimerIcon,
+  TokensIcon,
+  ChatBubbleIcon,
+} from '@radix-icons/vue';
 import { Network, IdCard, Grid2x2 } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
@@ -14,18 +19,17 @@ const routes = ref([
   { path: '/photosheet-maker', display: 'Photo Sheet' },
   { path: '/connected-pc', display: 'Connected PC' },
   { path: '/history', display: 'History' },
-])
+]);
 
-const route = useRoute()
-const lordStore = useLordStore()
-const localIP = ip.address()
-const version = ref('1.0.0')
-
+const route = useRoute();
+const lordStore = useLordStore();
+const localIP = ip.address();
+const version = ref('1.0.0');
 
 onMounted(async () => {
-  let o = await ipcRenderer.invoke('version')
+  let o = await ipcRenderer.invoke('version');
   version.value = o;
-})
+});
 </script>
 
 <template lang="pug">

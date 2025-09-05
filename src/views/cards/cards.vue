@@ -81,13 +81,14 @@ const options = ref(
     { label: 'Aadhaar Card', value: 'aadhaar' },
     { label: 'Ayushman Card', value: 'ayushman' },
     { label: 'Pan Card', value: 'pan' },
+    { label: 'Voter ID(New) Card', value: 'voter_new' },
   ].sort((a, b) => {
     if (b.value == 'custom') return 1;
     return a.label.localeCompare(b.label);
   }),
 );
 const providers = ref([
-  { label: 'UTI/ITSL', value: 'uti' },
+  { label: 'UTIITSL', value: 'uti' },
   { label: 'NSDL', value: 'nsdl' },
 ]);
 

@@ -1,8 +1,8 @@
 === MotionPrinter ===
 Contributors : yourabusufiyan
-Donate link: paypal.me/yourabusufiyan
 Author:  Abu Sufiyan
 Author URI: https://github.com/yourabusufiyan/
+Donate link: paypal.me/yourabusufiyan
 
 Any of the them, i forget to to credit. let me know i will
 add. Any of the libraries/plugin/software credits goes to 

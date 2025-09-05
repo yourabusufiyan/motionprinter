@@ -56,13 +56,14 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   cardFront?: string | null;
   cardBack?: string | null;
   cardType:
-    | 'eshram'
-    | 'abha'
-    | 'aadhaar'
-    | 'ayushman'
-    | 'custom'
-    | 'pan'
-    | null;
+  | 'eshram'
+  | 'abha'
+  | 'aadhaar'
+  | 'ayushman'
+  | 'custom'
+  | 'pan'
+  | 'voter_new'
+  | null;
   provider?: 'uti' | 'nsdl' | null;
   password?: string | null;
   errorMessage?: string | null;

@@ -17,9 +17,7 @@
       "@/*": ["./src/*"]
     },
     "plugins": [
-      {
-        "name": "@vue/language-plugin-pug"
-      }
+      { "name": "@vue/language-plugin-pug" }
     ],
     "declaration": true
   },

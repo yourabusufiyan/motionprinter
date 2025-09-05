@@ -418,7 +418,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
             }
           },
         );
-      } else if (['abha', 'ayushman'].includes(card?.cardType as string)) {
+      } else if (['abha', 'ayushman', 'voter_new'].includes(card?.cardType as string)) {
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
             // @ts-ignore
@@ -462,7 +462,18 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               backCropOptions.top = 397;
               backCropOptions.width = 1270;
               backCropOptions.height = 638;
+            } else if (card.cardType == 'voter_new') {
+              frontCropOptions.left = 136;
+              frontCropOptions.top = 396;
+              frontCropOptions.width = 1019;
+              frontCropOptions.height = 640;
+
+              backCropOptions.left = 1363;
+              backCropOptions.top = 396;
+              backCropOptions.width = 1019;
+              backCropOptions.height = 640;
             }
+
 
             try {
               await cropImage(imagePath, frontOutputPath, frontCropOptions);
@@ -701,7 +712,7 @@ ipcMain.on(
               os.homedir(),
               'Downloads',
               obj?.filename ||
-                `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`,
+              `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`,
             ),
           },
         );

@@ -537,7 +537,7 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     const dpi = 300; // 300 DPI for high quality
     const mmToPx = (mm: number) => Math.round((mm / 25.4) * dpi); // Convert mm to pixels
     // Convert position and size to points (72 points per inch)
-    const mmToPt = (mm: number) => (mm / 25.4) * 72;
+    const mmToPt = (mm: number) => mm * 72 / 25.4;
 
     const atmWidthPx = mmToPx(85.6); // ATM card width in pixels
     const atmHeightPx = mmToPx(53.98); // ATM card height in pixels
@@ -575,26 +575,31 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
         .resize(atmWidthPx, atmHeightPx, { fit: 'fill' })
         .toBuffer();
 
+      let cardHeight = mmToPt(53.98);
+      let cardWidth  = mmToPt(85.6);
+
+      console.log(cardWidth, cardHeight)
+
       doc
         .image(front, mmToPt(12.86), mmToPt(top), {
-          width: 250,
-          height: 158,
+          width: cardWidth,
+          height: cardHeight,
         })
-        .rect(mmToPt(12.86) + 0.055, mmToPt(top) + 0.05, 250 - 0.1, 158 - 0.1)
+        .rect(mmToPt(12.86) + 0.055, mmToPt(top) + 0.05, cardWidth - 0.1, cardHeight - 0.1,)
         .lineWidth(0.1)
         .strokeColor('black')
         .stroke();
 
       doc
         .image(back, mmToPt(108.0338), mmToPt(top), {
-          width: 250,
-          height: 158,
+          width: cardWidth,
+          height: cardHeight,
         })
         .rect(
           mmToPt(108.0338) + 0.055,
           mmToPt(top) + 0.05,
-          250 - 0.1,
-          158 - 0.1,
+          cardWidth - 0.1,
+          cardHeight - 0.1,
         )
         .lineWidth(0.1)
         .strokeColor('black')

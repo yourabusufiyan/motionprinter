@@ -21,7 +21,7 @@ import { intToRGBA } from '@jimp/utils';
 import { sleep } from '../../helpers/both';
 import { print } from 'pdf-to-printer';
 
-import { isUndefined, last } from 'lodash';
+import { isUndefined, last, range, merge } from 'lodash';
 
 import expressAppClass from './express-app';
 import type { cardMaker, cardMakerPDF } from './express-app-d';
@@ -32,7 +32,9 @@ import {
   extractEshramCard,
   extractAadhaarCard,
   extractPanCard,
+  extractNielitStudentIDCard,
 } from './../helpers/cardmakers';
+
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
 process.env.DIST = path.join(process.env.DIST_ELECTRON, '../dist');
@@ -297,6 +299,11 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
         if (file.cardType == 'aadhaar') {
           opts.scale = Math.floor(Math.abs(pdfinfo.width_in_pts * (240 / 72)));
         }
+        if (file.cardType == 'nielit_student_id') {
+          opts.scale = 5262;
+        }
+
+        opts = merge({}, opts, file?.opts);
 
         pdf
           .convert(file.destination, opts)
@@ -360,9 +367,12 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
     page?.pdfs?.filter(async (card, i) => {
       if (card?.isConverted) return true;
 
-      if (card?.cardType == 'eshram') {
+      if (['eshram'].includes(card?.cardType as string) || (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar')) {
+
+        let execFilePath = path.join(pdf.path, 'pdfimages');
+
         execFile(
-          path.join(pdf.path, 'pdfimages'),
+          execFilePath,
           [
             '-png',
             card.destination,
@@ -389,36 +399,92 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
 
             if (card?.isCropped) return;
 
-            let cardName = path.basename(
-              card?.filename,
-              path.extname(card?.filename),
-            );
-            let imagePath = path.join(card.path, `${cardName}-000.png`);
+            let cardName = path.basename(card?.filename, path.extname(card?.filename));
 
-            const image = await Jimp.read(imagePath);
-            const { width, height } = image.bitmap;
 
-            if (width < 600) {
-              card.warningMessage =
-                'Card has very low resolution, it can be cropped incorrectly.';
-            }
+            if (card?.cardType == 'eshram') {
+              let imagePath = path.join(card.path, `${cardName}-000.png`);
+              const image = await Jimp.read(imagePath);
+              const { width, height } = image.bitmap;
 
-            card.cardBoth = imagePath;
-            if (await extractEshramCard(card.cardBoth, card.path, cardName)) {
-              card.cardFront = `${cardName}-front.png`;
-              card.cardBack = `${cardName}-back.png`;
-              card.isCropped = true;
-              if (page.pdfs?.length) {
-                page.pdfs[i] = card;
+              if (width < 600) {
+                card.warningMessage =
+                  'Card has very low resolution, it can be cropped incorrectly.';
               }
-              event.reply('cardMaker-image-extracted-success', page);
-              console.log('cardMaker-image-extracted-success');
-            } else {
-              event.reply('cardMaker-image-extracted-failure', { page, card });
+
+              card.cardBoth = imagePath;
+              if (await extractEshramCard(card.cardBoth, card.path, cardName)) {
+                card.cardFront = `${cardName}-front.png`;
+                card.cardBack = `${cardName}-back.png`;
+                card.isCropped = true;
+                if (page.pdfs?.length) {
+                  page.pdfs[i] = card;
+                }
+                event.reply('cardMaker-image-extracted-success', page);
+                console.log('cardMaker-image-extracted-success');
+              } else {
+                event.reply('cardMaker-image-extracted-failure', { page, card });
+              }
+            } else if (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar') {
+
+              execFile(
+                path.join(pdf.path, 'pdftotext'),
+                [
+                  card.destination,
+                  path.join(card.path, `${cardName}-text.txt`)
+                ],
+                async (error, stdout, stderr) => {
+
+                  if (error) {
+                    console.error('Error executing script:', error);
+                    card.isConverted = false;
+                    card.errorMessage = 'Something went wrong while extracting text from the pdf.';
+                    // @ts-ignore
+                    page.pdfs[i] = card;
+                    event.reply('cardMaker-failure', { page, card });
+                    return;
+                  }
+
+                  let photo = path.join(card.path, `${cardName}-020.png`);
+                  let qr = path.join(card.path, `${cardName}-021.png`);
+                  let textFilePath = path.join(card.path, `${cardName}-text.txt`);
+                  let textContent = '';
+
+                  if (fs.existsSync(textFilePath)) {
+                    textContent = fs.readFileSync(textFilePath, 'utf-8');
+                    // fs.unlinkSync(textFilePath);
+                  }
+
+                  let arr = textContent.split('\n').filter(el => el.length);
+                  let apaarData = {
+                    name: arr[3],
+                    dob: arr[5],
+                    gender: arr[7],
+                    abc_id: arr[9],
+                    signed_time: arr[11],
+                  }
+
+                  console.log('Extracted Text:', textContent);
+                  console.log('Extracted Text:', apaarData);
+
+                }
+              );
+
+              range(0, 20).map((el) => {
+                let filePath = path.join(card.path, `${cardName}-${String(el).padStart(3, '0')}.png`);
+                if (fs.existsSync(filePath)) {
+                  try {
+                    fs.unlinkSync(filePath);
+                    console.log(`Deleted: ${cardName}-${String(el).padStart(3, '0')}.png`);
+                  } catch (err) { err = !err; }
+                }
+              });
+
+
             }
-          },
+          }
         );
-      } else if (['abha', 'ayushman', 'voter_new'].includes(card?.cardType as string)) {
+      } else if (['abha', 'ayushman', 'voter_new', 'abc_apaar'].includes(card?.cardType as string)) {
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
             // @ts-ignore
@@ -472,12 +538,21 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               backCropOptions.top = 396;
               backCropOptions.width = 1019;
               backCropOptions.height = 640;
+            } else if (card.cardType == 'abc_apaar' && card.abcTo == 'abc') {
+              frontCropOptions.left = 589;
+              frontCropOptions.top = 15;
+              frontCropOptions.width = 1296;
+              frontCropOptions.height = 1009;
             }
 
 
             try {
               await cropImage(imagePath, frontOutputPath, frontCropOptions);
-              await cropImage(imagePath, backOutputPath, backCropOptions);
+              if (card.cardType == 'abc_apaar' && card.abcTo == 'abc') {
+                card.cardBack = `abc-back.png`;
+              } else {
+                await cropImage(imagePath, backOutputPath, backCropOptions);
+              }
               card.isCropped = true;
               if (page.pdfs?.length) {
                 page.pdfs[i] = card;
@@ -499,7 +574,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
             }
             event.reply('cardMaker-failure', { page, card });
           });
-      } else if (['aadhaar', 'pan'].includes(card?.cardType as string)) {
+      } else if (['aadhaar', 'pan', 'nielit_student_id'].includes(card?.cardType as string)) {
         console.log('aadhaar', card);
 
         pdf2image(card)
@@ -523,6 +598,8 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
             try {
               if (card?.cardType == 'aadhaar') {
                 await extractAadhaarCard(card);
+              } else if (card?.cardType == 'nielit_student_id') {
+                await extractNielitStudentIDCard(card);
               } else if (card?.cardType == 'pan') {
                 card.cardFront = `${cardName}-front.png`;
                 const frontOutputPath = path.join(card.path, card.cardFront);

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { join, extname, parse } from 'path';
@@ -52,6 +54,7 @@ import type { UploadedFile } from 'express-fileupload';
 
 import { Chat, Inbox, Message } from '../../src/declarations/inbox';
 import { ip_to_sequence, sleep } from '../../helpers/both';
+import { getAssetPath } from './../helpers/cardmakers';
 
 import dayjs from 'dayjs';
 
@@ -175,6 +178,45 @@ class expressAppClass {
     this.server = http.createServer(this.app);
 
     this.intervalInit();
+
+    try {
+      const sourceDir = getAssetPath();   // your assets folder
+      const destDir = this.dir[1];        // destination folder
+
+      // Ensure destination exists
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+
+      fs.readdir(sourceDir, (err, files) => {
+        if (err) {
+          console.error("Error reading source folder:", err);
+          return;
+        }
+
+        // filter only png/jpg files
+        const imageFiles = files.filter(file =>
+          /\.(png|jpg|jpeg)$/i.test(file)
+        );
+
+        imageFiles.forEach(file => {
+          const sourcePath = path.join(sourceDir, file);
+          const destPath = path.join(destDir, file);
+
+          fs.copyFile(sourcePath, destPath, (err) => {
+            if (err) {
+              console.error(`Error copying ${file}:`, err);
+            } else {
+              console.log(`Copied ${file} → ${destDir}`);
+            }
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Error in copying abc-back.png file:", error);
+    }
+
+
   }
 
   static handleServerError(error: any) {
@@ -492,9 +534,14 @@ class expressAppClass {
       fileData.path = expressAppClass.dir[1];
       fileData.size = sampleFile.size;
       fileData.temp = req.body?.temp == 'true';
+
       if (req.body?.provider) {
         // @ts-ignore for pan card or any others cards in future
         fileData.provider = req.body?.provider;
+      }
+      if (req.body?.abcTo) {
+        // @ts-ignore for abc-apaar card
+        fileData.abcTo = req.body?.abcTo;
       }
 
       let o: toPrintsCommandsFile = {
@@ -684,7 +731,7 @@ class expressAppClass {
           o.lastSeen = Date.now();
           computers.push(o);
         })
-        .catch((error) => {});
+        .catch((error) => { });
     }
 
     let computerNameList = computers.map((el) => el?.ip);

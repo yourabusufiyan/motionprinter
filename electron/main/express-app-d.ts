@@ -63,8 +63,12 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   | 'custom'
   | 'pan'
   | 'voter_new'
+  | 'abc_apaar'
+  | 'csc_id'
+  | 'nielit_student_id'
   | null;
   provider?: 'uti' | 'nsdl' | null;
+  abcTo?: 'abc' | 'apaar' | null;
   password?: string | null;
   errorMessage?: string | null;
   warningMessage?: string | null;
@@ -75,6 +79,7 @@ export type cardMaker = {
   filename?: string;
   path?: string | null;
   outputFile?: string | null;
+  cardPerSheet?: number;
   pdfs?: cardMakerPDF[];
 };
 

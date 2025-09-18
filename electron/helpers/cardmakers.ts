@@ -8,6 +8,19 @@ import { intToRGBA } from '@jimp/utils';
 import type { Region } from 'sharp';
 import type { cardMaker, cardMakerPDF } from '../main/express-app-d';
 import { last, toString } from 'lodash';
+import { app } from "electron";
+
+
+// Utility function for resolving assets
+export function getAssetPath(...paths: string[]) {
+  if (app.isPackaged) {
+    // After build → resources/assets/
+    return path.join(process.resourcesPath, "assets", ...paths);
+  } else {
+    // During dev → electron/assets/
+    return path.join(process.cwd(), "electron", "assets", ...paths);
+  }
+}
 
 function areConsecutive(...args: (number | number[])[]): boolean {
   // Normalize input: if first arg is an array, use it, otherwise use args
@@ -529,6 +542,130 @@ export async function extractEshramCard(
     console.error('Error:', error);
     return false;
   }
+}
+
+export async function extractNielitStudentIDCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time('extractNielitStudentIDCard');
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const outputFormatFileName = `${path.join(pdf.path, cardName)}`;
+
+    const BORDER_COLOR = { r: 0, g: 0, b: 0 };
+    const COLOR_TOLERANCE = 2;
+    const MIN_BORDER_RATIO = 0.20;
+
+    try {
+      const image = await Jimp.read(inputPath);
+      const { width, height, data } = image.bitmap;
+
+      // Precalculate pixel check function
+      const isBorder = (r: number, g: number, b: number) =>
+        Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+        Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+        Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+      // Optimized border detection using buffer directly
+      const getHorizontalBorders = () => {
+        const borders = [];
+        const pixelThreshold = width * MIN_BORDER_RATIO;
+        let skipped_once = false;
+
+        for (let y = 0; y < height; y++) {
+          let borderCount = 0;
+          const yOffset = y * width * 4;
+
+          for (let x = 0; x < width; x++) {
+            const idx = yOffset + x * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(y);
+                break; // Early exit for rows
+              }
+            }
+          }
+
+
+        }
+        console.log('horizontal borders', borders)
+        return borders;
+      };
+
+      // Vertical border detection within horizontal regions
+      const getVerticalBorders = (yStart: number, yEnd: number) => {
+        const borders = [];
+        const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+        for (let x = 0; x < width; x++) {
+          let borderCount = 0;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const idx = (y * width + x) * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(x);
+                break; // Early exit for columns
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Main processing
+      const horizontalBorders = getHorizontalBorders();
+      const regions = [];
+
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        if (yEnd - yStart < 5) continue;
+        const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+        // Generate regions
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const region = {
+            x: verticalBorders[j] + 1,
+            y: yStart,
+            w: verticalBorders[j + 1] - verticalBorders[j] - 1,
+            h: yEnd - yStart + 1,
+          };
+
+          if (region.w > 100 && region.h > 100) {
+            regions.push(region);
+          }
+        }
+      }
+
+      // Save regions
+      if (regions.length === 0) {
+        console.log("No regions found");
+        return;
+      }
+
+      console.log('regions', regions)
+
+      await Promise.all(
+        regions.filter(el => el.h > 100 && el.w > 100).map(async (region, index) => {
+          console.log('cropping region', `${outputFormatFileName}-${index == 0 ? 'front' : 'back'}.png`)
+          await image.clone().crop(region).write(`${outputFormatFileName}-${index == 0 ? 'front' : 'back'}.png`);
+        })
+      );
+      console.timeEnd("extractNielitStudentIDCard");
+      resolve(pdf);
+      console.log(`Extracted nielit student id card`);
+    } catch (error) {
+      console.error("Error:", error);
+      console.timeEnd("extractNielitStudentIDCard");
+      reject(pdf);
+    }
+  });
 }
 
 export async function createA4WithImagesPDF(maker: cardMaker) {

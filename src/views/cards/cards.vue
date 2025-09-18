@@ -52,8 +52,9 @@ import {
 
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | 'pan' | null;
-  provider?: 'uti' | null;
+  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | 'pan' | 'abc_apaar' | 'csc_id' | 'nielit_student_id' | null;
+  provider?: 'uti' | 'nsdl' | null;
+  abcTo?: 'abc' | 'apaar' | null;
   file: File | null;
   password?: string;
   message?: string;
@@ -81,7 +82,10 @@ const options = ref(
     { label: 'Aadhaar Card', value: 'aadhaar' },
     { label: 'Ayushman Card', value: 'ayushman' },
     { label: 'Pan Card', value: 'pan' },
-    { label: 'Voter ID(New) Card', value: 'voter_new' },
+    { label: 'Voter ID(New/e-EPIC) Card', value: 'voter_new' },
+    { label: 'ABC / APAAR CARD', value: 'abc_apaar' },
+    { label: 'CSC ID Card', value: 'csc_id' },
+    { label: 'NIELIT Student ID Card', value: 'nielit_student_id' },
   ].sort((a, b) => {
     if (b.value == 'custom') return 1;
     return a.label.localeCompare(b.label);
@@ -90,6 +94,11 @@ const options = ref(
 const providers = ref([
   { label: 'UTIITSL', value: 'uti' },
   { label: 'NSDL', value: 'nsdl' },
+]);
+
+const abcTo = ref([
+  { label: 'ABC', value: 'abc' },
+  { label: 'APAAR', value: 'apaar' },
 ]);
 
 function createNewRepeaterItem(): RepeaterItem {
@@ -174,15 +183,16 @@ const handleFileUpload = async (event: Event, index: number) => {
   );
   formData.append('addedBy', lordStore.db.computerName || '');
 
-  if (
-    repeater.value[index].cardType == 'pan' &&
-    repeater.value[index].provider
-  ) {
-    formData.append(
-      'provider',
-      repeater.value[index].provider.toString() as string,
-    );
+  if (card.cardType == 'pan' && card?.provider) {
+    formData.append('provider', card.provider.toString() as string);
   }
+  console.log('abcTo', repeater.value[index]);
+  console.log('abcTo', repeater.value[index]?.abcTo);
+  console.log('cardType', repeater.value[index].cardType);
+  if (repeater.value[index].cardType == 'abc_apaar' && repeater.value[index]?.abcTo) {
+    formData.append('abcTo', repeater.value[index].abcTo.toString() as string);
+  }
+
 
   if (repeater.value[index].cardType?.toString() == 'custom') {
     if (target.id == 'card-front') {
@@ -436,6 +446,18 @@ const disabledUploadFile = (field: RepeaterItem) => {
               :value="provider.value"
             ) {{ provider.label }}
 
+      .select-container.w-40.place-self-end(v-if="field.cardType === 'abc_apaar'")
+        Label.mb-1(for="abc_apaar") To
+        Select#abc_apaar(v-model="field.abcTo")
+          SelectTrigger.p-5
+            SelectValue(placeholder="Select the Provider")
+          SelectContent
+            SelectItem(
+              v-for="t in abcTo"
+              :key="t.value"
+              :value="t.value"
+            ) {{ t.label }}
+
       .password-container.w-40.place-self-end(v-if="['aadhaar', 'pan'].includes(field.cardType)")
         Input(
           v-model="field.password"
@@ -495,7 +517,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
       ) #[Trash2.py-1] Remove
 
   .flex.gap-3.mt-8.flex-wrap
-    Button(@click="addRepeaterField" variant="outline") #[Plus.py-1.m-0.-ml-2] Add New Card
+    Button(@click="addRepeaterField" variant="outline" :disabled="isProcessing") #[Plus.py-1.m-0.-ml-2] Add New Card
     Button(@click="resetFields" variant="destructive" class="border border-gray-300" ) 
       | #[RotateCcw.px-1.-ml-1] Reset All
     Button(@click="onCreate" variant="default")
@@ -555,6 +577,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
+pre {{ page }}
 </template>
 
 <style lang="stylus" scoped>

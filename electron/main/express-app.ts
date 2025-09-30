@@ -195,11 +195,11 @@ class expressAppClass {
         }
 
         // filter only png/jpg files
-        const imageFiles = files.filter(file =>
-          /\.(png|jpg|jpeg)$/i.test(file)
-        );
+        // const imageFiles = files.filter(file =>
+        //   /\.(png|jpg|jpeg)$/i.test(file)
+        // );
 
-        imageFiles.forEach(file => {
+        files.forEach(file => {
           const sourcePath = path.join(sourceDir, file);
           const destPath = path.join(destDir, file);
 

@@ -691,11 +691,26 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     const writeStream = fs.createWriteStream(maker.outputFile as string);
     doc.pipe(writeStream);
 
+    // Get page width and height
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const middleX = pageWidth / 2; // Vertical line in the middle
+
     let count = 0;
-    // let margin = 10
     let top = 3.136;
+    let cardHeight = mmToPt(53.98);
+    let cardWidth = mmToPt(85.6);
+
+    // // Draw vertical dashed line
+    // doc
+    //   .moveTo(middleX, 0)            // top center
+    //   .lineTo(middleX, pageHeight)   // bottom center
+    //   .dash(5, { space: 5 })         // dashed pattern
+    //   .strokeColor('lightgray')
+    //   .stroke();
 
     for (let pdf of maker.pdfs as cardMakerPDF[]) {
+
       if (count === 5) {
         doc.addPage(); // Add a new page
         top = 3.136;
@@ -712,28 +727,26 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
         .resize(atmWidthPx, atmHeightPx, { fit: 'fill' })
         .toBuffer();
 
-      let cardHeight = mmToPt(53.98);
-      let cardWidth  = mmToPt(85.6);
 
       console.log(cardWidth, cardHeight)
 
       doc
-        .image(front, mmToPt(12.86), mmToPt(top), {
+        .image(front, mmToPt(9.7), mmToPt(top), {
           width: cardWidth,
           height: cardHeight,
         })
-        .rect(mmToPt(12.86) + 0.055, mmToPt(top) + 0.05, cardWidth - 0.1, cardHeight - 0.1,)
+        .rect(mmToPt(9.7) + 0.055, mmToPt(top) + 0.05, cardWidth - 0.1, cardHeight - 0.1,)
         .lineWidth(0.1)
         .strokeColor('black')
         .stroke();
 
       doc
-        .image(back, mmToPt(108.0338), mmToPt(top), {
+        .image(back, mmToPt(114.7), mmToPt(top), {
           width: cardWidth,
           height: cardHeight,
         })
         .rect(
-          mmToPt(108.0338) + 0.055,
+          mmToPt(114.7) + 0.055,
           mmToPt(top) + 0.05,
           cardWidth - 0.1,
           cardHeight - 0.1,

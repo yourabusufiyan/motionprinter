@@ -16,12 +16,13 @@ import { address } from 'ip';
 // @ts-ignore
 import pdf from 'pdf-poppler';
 import { execFile } from 'child_process';
-import { Jimp } from 'jimp';
-import { intToRGBA } from '@jimp/utils';
+import { Jimp, loadFont, measureText, measureTextHeight } from "jimp";
 import { sleep } from '../../helpers/both';
 import { print } from 'pdf-to-printer';
 
 import { isUndefined, last, range, merge } from 'lodash';
+import QRCodeGenerator from "qrcode";
+import QrCodeReader from "qrcode-reader";
 
 import expressAppClass from './express-app';
 import type { cardMaker, cardMakerPDF } from './express-app-d';
@@ -33,7 +34,8 @@ import {
   extractAadhaarCard,
   extractPanCard,
   extractNielitStudentIDCard,
-} from './../helpers/cardmakers';
+} from '../helpers/cardmakers';
+import { writer } from 'repl';
 
 
 process.env.DIST_ELECTRON = path.join(__dirname, '..');
@@ -231,10 +233,25 @@ ipcMain.on('download-file', async (event, file) => {
     }
 
     // Read the local file and write to the chosen location
-    const readStream = fs.createReadStream(file.destination);
     const writeStream = fs.createWriteStream(savePath);
 
-    readStream.pipe(writeStream);
+    if (file?.fileUrl) {
+
+      const response = await axios({
+        method: 'GET',
+        url: file?.fileUrl,
+        responseType: 'stream'
+      });
+
+      // Pipe the response data to a file
+      response.data.pipe(writeStream);
+
+    } else {
+      const readStream = fs.createReadStream(file.destination);
+      readStream.pipe(writeStream);
+    }
+
+
 
     writeStream.on('finish', () => {
       event.reply('download-success', file);
@@ -367,7 +384,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
     page?.pdfs?.filter(async (card, i) => {
       if (card?.isConverted) return true;
 
-      if (['eshram'].includes(card?.cardType as string) || (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar')) {
+      if (['eshram', 'csc_id'].includes(card?.cardType as string) || (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar')) {
 
         let execFilePath = path.join(pdf.path, 'pdfimages');
 
@@ -401,7 +418,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
 
             let cardName = path.basename(card?.filename, path.extname(card?.filename));
 
-
+            // for Eshram Card processing
             if (card?.cardType == 'eshram') {
               let imagePath = path.join(card.path, `${cardName}-000.png`);
               const image = await Jimp.read(imagePath);
@@ -425,6 +442,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               } else {
                 event.reply('cardMaker-image-extracted-failure', { page, card });
               }
+              // for APAAR Card processing
             } else if (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar') {
 
               execFile(
@@ -445,7 +463,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                     return;
                   }
 
-                  let photo = path.join(card.path, `${cardName}-020.png`);
+                  let photoPath = path.join(card.path, `${cardName}-020.png`);
                   let qr = path.join(card.path, `${cardName}-021.png`);
                   let textFilePath = path.join(card.path, `${cardName}-text.txt`);
                   let textContent = '';
@@ -455,17 +473,59 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                     // fs.unlinkSync(textFilePath);
                   }
 
-                  let arr = textContent.split('\n').filter(el => el.length);
+                  let arr = textContent.split('\n').filter(el => el.length > 1).map(el => el.replace(/\r/g, ""));
                   let apaarData = {
                     name: arr[3],
                     dob: arr[5],
                     gender: arr[7],
-                    abc_id: arr[9],
+                    abc_id: arr[9].replace(/(.{4})/g, "$1 ").trim(),
                     signed_time: arr[11],
                   }
-
-                  console.log('Extracted Text:', textContent);
                   console.log('Extracted Text:', apaarData);
+
+                  // Load base image 
+                  // apaar-front.png
+                  let image = await Jimp.read(path.join(os.homedir(), app.getName(), './upload/apaar-front.png'));
+                  let fontPath = path.join(os.homedir(), app.getName(), './upload/open-sans-32-black.fnt');
+                  let font = await loadFont(fontPath);
+
+                  // setting profile photo
+                  const photo = await Jimp.read(photoPath);
+                  image.composite(photo, 117.5, 278);
+
+                  // writing texts and positioning them correctly
+                  const texts = [
+                    { x: 347, y: 278, text: apaarData.name, font },
+                    { x: 347, y: 350, text: apaarData.dob, font },
+                    { x: 347, y: 409, text: apaarData.gender, font },
+                    { x: 330, y: 515, font, text: apaarData.abc_id, scale: 42 / 32 }, // big/bold
+                  ];
+
+                  // Print texts
+                  for (const t of texts) {
+                    const tempImage = new Jimp({ width: 1000, height: 100, color: 0x00000000 });
+                    tempImage.print({ font: t.font, x: 0, y: 0, text: t.text });
+                    tempImage.scale(t?.scale ? t.scale : 1);
+                    image.composite(tempImage, t.x, t.y);
+                  }
+
+                  // Position QR code
+                  const qrImage = await Jimp.read(qr);
+                  qrImage.resize({ w: 256, h: 256 }); // resize to fit
+                  image.composite(qrImage, 705, 300);
+
+                  // Save final result
+                  await image.write(`${path.join(card.path, `${cardName}-front`)}.png`);
+
+                  card.cardBoth = `${cardName}-front.png`;
+                  card.cardFront = `${cardName}-front.png`;
+                  card.cardBack = `apaar-back.png`;
+                  card.isCropped = true;
+                  if (page.pdfs?.length) {
+                    page.pdfs[i] = card;
+                  }
+                  event.reply('cardMaker-image-extracted-success', page);
+                  console.log('cardMaker-image-extracted-success');
 
                 }
               );
@@ -481,6 +541,113 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               });
 
 
+            } else if (card?.cardType == 'csc_id') {
+              try {
+
+                let baseImagePath = path.join(card.path, "csc-front-template.png");
+                let photoPath = path.join(card.path, `${cardName}-002.png`);
+                let qrPath = path.join(card.path, `${cardName}-003.png`);
+                let fontPath = path.join(os.homedir(), app.getName(), './upload/open-sans-32-black.fnt');
+
+                // Loading images
+                const image = await Jimp.read(baseImagePath);
+                const photo = await Jimp.read(photoPath);
+                const qr = await Jimp.read(qrPath);
+                const font = await loadFont(fontPath);
+                let qrText: string[] = ["ownerName", "CSC ID", "KIOSK name", "KIOSK address", "Mobile number"];
+
+                // setting profile photo
+                photo.resize({ w: 231, h: 233 });
+                image.composite(photo, 88, 206);
+
+                let qrcode = new QrCodeReader();
+                qrcode.callback = function (err: any, value: { result: string }) {
+                  if (err) console.error(err);
+                  qrText = value.result.split("|");
+                  console.log('qrText', qrText);
+                };
+                // Decoding the QR code
+                qrcode.decode(qr.bitmap);
+
+                // writing texts and positioning them correctly
+                type textsType = { x: number, y: number, text?: string, font: any, scale?: number };
+                const texts: textsType[] = [
+                  { x: 408, y: 156, font },
+                  { x: 631, y: 210, font, scale: 22 / 32 },
+                  { x: 631, y: 250, font, scale: 25 / 32 },
+                  { x: 631, y: 294, font, scale: 26 / 32 },
+                  { x: 631, y: 338, font, scale: 25 / 32 },
+                ];
+
+                texts.map((t, i) => {
+                  t.text = qrText[i] || "";
+                  t.text = i === 0 ? t.text.toUpperCase() : t.text;
+                  t.text = i === 4 ? t.text : t.text;
+                  return t;
+                });
+
+                // Print texts
+                texts.forEach((t, i) => {
+                  const tempImage = new Jimp({
+                    width: 1000,
+                    height: 100,
+                    color: 0x00000000,
+                  });
+                  if (i === 0) {
+                    tempImage.print({
+                      font: t.font, x: 0, y: 0, text: t.text as string, cb: (xy) => {
+                        console.log(xy);
+                        tempImage.scan(0, 0, xy.x, xy.y, function (xx, yy, idx) {
+                          // Apply tint manually
+                          tempImage.bitmap.data[idx + 0] = 0;   // Red
+                          tempImage.bitmap.data[idx + 1] = 110; // Green
+                          tempImage.bitmap.data[idx + 2] = 170; // Blue
+                        });
+                      }
+                    });
+                  } else {
+                    tempImage.print({ font: t.font, x: 0, y: 0, text: t.text as string });
+                  }
+                  tempImage.scale(t?.scale ? t.scale : 1);
+                  image.composite(tempImage, t.x, t.y);
+                })
+
+                // Generate QR code
+                const qrPngBuffer = await QRCodeGenerator.toBuffer(
+                  JSON.stringify(qrText.join("|")),
+                  {
+                    type: "png",
+                    errorCorrectionLevel: "M",
+                    margin: 5,
+                    width: 154,
+                  }
+                );
+                const qrImage = await Jimp.read(qrPngBuffer);
+                image.composite(qrImage, 816, 444); // Position QR code
+
+                // Save final result
+                await image.write(`${path.join(card.path, `${cardName}-front`)}.png`);
+
+                card.cardBoth = `${cardName}-front.png`;
+                card.cardFront = `${cardName}-front.png`;
+                card.cardBack = `csc-back.png`;
+                card.isCropped = true;
+                if (page.pdfs?.length) {
+                  page.pdfs[i] = card;
+                }
+                event.reply('cardMaker-image-extracted-success', page);
+                console.log('cardMaker-image-extracted-success');
+
+                console.log("✅ CSC Card Done — saved to");
+              } catch (error) {
+                console.error('❌Error executing script:', error);
+                card.isConverted = false;
+                card.errorMessage = 'Something went wrong while extracting text from the pdf.';
+                // @ts-ignore
+                page.pdfs[i] = card;
+                event.reply('cardMaker-failure', { page, card });
+                return;
+              }
             }
           }
         );

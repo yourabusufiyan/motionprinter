@@ -48,11 +48,25 @@ import {
   Trash2,
   IdCard,
   Printer,
+  ImageDown
 } from 'lucide-vue-next';
+
+type cardType =
+  | 'custom'
+  | 'aadhaar'
+  | 'abc_apaar'
+  | 'abha'
+  | 'ayushman'
+  | 'csc_id'
+  | 'eshrem'
+  | 'nielit_student_id'
+  | 'pan'
+  | 'voter_new'
+  | null;
 
 interface RepeaterItem {
   id: string;
-  cardType: 'eshrem' | 'abha' | 'aadhaar' | 'custom' | 'pan' | 'abc_apaar' | 'csc_id' | 'nielit_student_id' | null;
+  cardType: cardType;
   provider?: 'uti' | 'nsdl' | null;
   abcTo?: 'abc' | 'apaar' | null;
   file: File | null;
@@ -101,6 +115,13 @@ const abcTo = ref([
   { label: 'APAAR', value: 'apaar' },
 ]);
 
+function resetCreatedPDF() {
+  if (page.value?.pdfs?.length && page.value?.outputFile) {
+    page.value.outputFile = null;
+    page.value.filename = '';
+  }
+}
+
 function createNewRepeaterItem(): RepeaterItem {
   return {
     id: uuidv7(),
@@ -136,6 +157,7 @@ const removeRepeaterField = (index: number) => {
     );
   }
   repeater.value.splice(index, 1);
+  resetCreatedPDF();
   saveToMain();
 };
 const handlePasswordChange = async (
@@ -152,6 +174,7 @@ const handlePasswordChange = async (
     isProcessing.value = true;
     ipcRenderer.send('cardMaker', cloneDeep(page.value));
   }
+
 };
 
 const handleFileUpload = async (event: Event, index: number) => {
@@ -161,6 +184,13 @@ const handleFileUpload = async (event: Event, index: number) => {
   const password = card?.password;
 
   if (!file) return;
+
+  resetCreatedPDF();
+
+  if (!card.cardType) {
+    message.value = 'Please select the card type first';
+    return;
+  }
 
   if (isProcessing.value) {
     messageWarning.value = 'Please wait while processing the card...';
@@ -252,6 +282,8 @@ const resetFields = () => {
   messageWarningFile.value = '';
   isProcessing.value = false;
   isDataToProcess.value = false;
+  resetCreatedPDF();
+  saveToMain();
 };
 
 // IPC Event Handlers
@@ -353,7 +385,22 @@ const onDownload = () => {
   }
 };
 
-const onSelectChange = (value: string, index: number) => {
+const onImageDownload = (card: $cardMakerPDF, side: 'front' | 'back') => {
+
+  let ImageName = side === 'front' ? card.cardFront : card.cardBack;
+  const file = {
+    fileUrl: `http://${lordStore.db.ip}:9457/upload/${ImageName}`,
+    originalName: card.id + (side === 'front' ? '-front' : '-back') + path.extname(ImageName as string),
+  };
+
+  try {
+    ipcRenderer.send('download-file', cloneDeep(file));
+  } catch (error) {
+    console.error('Download failed:', error);
+  }
+};
+
+const onSelectChange = (value: cardType, index: number) => {
   if (page.value?.pdfs?.length) {
     page.value.pdfs = page.value?.pdfs?.filter(
       (el: $cardMakerPDF) => el?.id != repeater.value[index]?.id,
@@ -362,6 +409,7 @@ const onSelectChange = (value: string, index: number) => {
     saveToMain();
   }
   repeater.value[index].cardType = value as 'abha' | 'eshrem';
+  resetCreatedPDF();
 };
 
 const onCreate = () => {
@@ -521,7 +569,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
     Button(@click="resetFields" variant="destructive" class="border border-gray-300" ) 
       | #[RotateCcw.px-1.-ml-1] Reset All
     Button(@click="onCreate" variant="default")
-      | #[FileText.px-1.-ml-1] Create PDF
+      | #[FileText.px-1.-ml-1] {{ page?.outputFile ? 'Re-create PDF' : 'Create PDF' }}
     Button(
       @click="onDownload"
       v-if="page?.outputFile"
@@ -544,8 +592,14 @@ const disabledUploadFile = (field: RepeaterItem) => {
   .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF
     .card-container
-      .flex.items-center.justify-center.gap-4(v-for="card in page?.pdfs?.filter(isObject)" :key="card.id")
-        .card-front.flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
+      .flex.items-center.justify-center.gap-4.mb-4(v-for="card in page?.pdfs?.filter(isObject)" :key="card.id")
+        .card-front.flex-1.border.border-gray-200.rounded-lg.min-h-32.max-h-64.relative
+          .download-icon.absolute.top-0.right-0.bg-black.text-white.p-2.transition-all.ease-out.opacity-20(
+            class="border border-black rounded-bl-lg",
+            class="hover:cursor-pointer hover:bg-white hover:text-black hover:opacity-100 ",
+            @click="onImageDownload(card, 'front')"
+          )
+            ImageDown
           img(
             v-if="card?.cardFront"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardFront}`"
@@ -561,7 +615,13 @@ const disabledUploadFile = (field: RepeaterItem) => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
-        .card-back.flex-1.mb-4.border.border-gray-200.rounded-lg.min-h-32.max-h-64
+        .card-back.flex-1.border.border-gray-200.rounded-lg.min-h-32.max-h-64.relative
+          .download-icon.absolute.top-0.right-0.bg-black.text-white.p-2.transition-all.ease-out.opacity-20(
+            class="border border-black rounded-bl-lg",
+            class="hover:cursor-pointer hover:bg-white hover:text-black hover:opacity-100",
+            @click="onImageDownload(card, 'back')"
+          )
+            ImageDown
           img(
             v-if="card?.cardBack"
             :src="`http://${lordStore.db.ip}:9457/upload/${card.cardBack}`"

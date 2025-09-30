@@ -16,11 +16,9 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "plugins": [
-      { "name": "@vue/language-plugin-pug" }
-    ],
+    "plugins": [{ "name": "@vue/language-plugin-pug" }],
     "declaration": true
   },
-  "include": ["src"],
+  "include": ["src", "electron/main/index.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

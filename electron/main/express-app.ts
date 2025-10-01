@@ -388,14 +388,12 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
-        let domain = "https://www.motionprinter.com"
+        let domain = "https://mp.snacksoft.in"
         let computerName = this.db.data.computerName || '';
         let userId = this.db.data.id || '';
         let url = `${domain}/?user_id=${userId}&computerName=${computerName}`;
-        // this.win?.webContents.send('onlineUsers', { online: false, online_users: random(100, 500) });
         axios.get(url)
           .then((res) => {
-            console.log('Online user data', url, res.data);
             this.win?.webContents.send('onlineUsers', { ...{ online: true }, ...res.data });
           })
           .catch(async () => {
@@ -403,7 +401,7 @@ class expressAppClass {
           });
         await sleep(30_000);
       }
-    }, 60_000);
+    }, 20_000);
 
   }
 

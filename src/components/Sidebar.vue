@@ -94,7 +94,7 @@ aside.top-0.left-0.fixed
             router-link( to="/help" class="underline hover:no-underline") HELP
             router-link( to="/help#faq" class="underline hover:no-underline") FAQs
             .inline.online-users-count(v-if="onlineUsers?.online_users")
-              NumberFlow(:value="onlineUsers?.online_users  || 0")
+              NumberFlow(:value="(+onlineUsers?.online_users + 100)  || 0")
 
           .flex.items-center.gap-x-2
             a.hidden(href="#")

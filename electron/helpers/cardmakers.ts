@@ -697,25 +697,28 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     const middleX = pageWidth / 2; // Vertical line in the middle
 
     let count = 0;
-    let top = 3.136;
+    let top = 4.5083;
     let cardHeight = mmToPt(53.98);
     let cardWidth = mmToPt(85.6);
+    console.log(cardWidth, cardHeight)
 
-    // // Draw vertical dashed line
-    // doc
-    //   .moveTo(middleX, 0)            // top center
-    //   .lineTo(middleX, pageHeight)   // bottom center
-    //   .dash(5, { space: 5 })         // dashed pattern
-    //   .strokeColor('lightgray')
-    //   .stroke();
 
     for (let pdf of maker.pdfs as cardMakerPDF[]) {
 
       if (count === 5) {
         doc.addPage(); // Add a new page
-        top = 3.136;
+        top = 4.5083;
         count = 0;
       }
+
+      // Draw vertical dashed line
+      doc
+        .moveTo(middleX, 0)            // top center
+        .lineTo(middleX, mmToPt(top + 2.2541) + cardHeight)   // bottom center
+        .dash(5, { space: 5 })         // dashed pattern
+        .lineWidth(0.5)
+        .strokeColor('lightgray')
+        .stroke();
 
       // Resize the images to ATM card size
       const basePath = pdf.path;
@@ -727,9 +730,6 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
         .resize(atmWidthPx, atmHeightPx, { fit: 'fill' })
         .toBuffer();
 
-
-      console.log(cardWidth, cardHeight)
-
       doc
         .image(front, mmToPt(9.7), mmToPt(top), {
           width: cardWidth,
@@ -737,6 +737,7 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
         })
         .rect(mmToPt(9.7) + 0.055, mmToPt(top) + 0.05, cardWidth - 0.1, cardHeight - 0.1,)
         .lineWidth(0.1)
+        .undash()
         .strokeColor('black')
         .stroke();
 
@@ -755,8 +756,20 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
         .strokeColor('black')
         .stroke();
 
-      top += 58.5748;
+      top += 53.99 + 4.5083; // card height with 1mm stroke
       count++;
+
+      if (count != 5) {
+        // Draw horizontal dashed line
+        doc
+          .moveTo(0, mmToPt(top - 2.2541))            // left middle
+          .lineTo(pageWidth, mmToPt(top - 2.2541))    // right middle
+          .dash(5, { space: 5 })     // dashed pattern
+          .lineWidth(0.5)
+          .strokeColor('lightgray')
+          .stroke();
+      }
+
     }
 
     // Finalize the PDF

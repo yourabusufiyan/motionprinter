@@ -10,6 +10,8 @@ import {
   ChatBubbleIcon,
 } from '@radix-icons/vue';
 import { Network, IdCard, Grid2x2 } from 'lucide-vue-next';
+import AnimatedCounter from "vue-animated-counter"
+import NumberFlow from '@number-flow/vue'
 
 import { ipcRenderer } from 'electron';
 
@@ -25,11 +27,18 @@ const route = useRoute();
 const lordStore = useLordStore();
 const localIP = ip.address();
 const version = ref('1.0.0');
+const onlineUsers = ref<null | object>(null);
 
 onMounted(async () => {
   let o = await ipcRenderer.invoke('version');
   version.value = o;
 });
+
+ipcRenderer.on('onlineUsers', (event, arg) => {
+  console.log('onlineUsers', arg);
+  onlineUsers.value = arg;
+});
+
 </script>
 
 <template lang="pug">
@@ -81,10 +90,11 @@ aside.top-0.left-0.fixed
           )
 
         .mt-6(class="sm:mt-3")
-
           .small-nav.text-xs.font-semibold(class="space-x-1.5")
             router-link( to="/help" class="underline hover:no-underline") HELP
             router-link( to="/help#faq" class="underline hover:no-underline") FAQs
+            .inline.online-users-count(v-if="onlineUsers?.online_users")
+              NumberFlow(:value="onlineUsers?.online_users  || 0")
 
           .flex.items-center.gap-x-2
             a.hidden(href="#")
@@ -97,3 +107,16 @@ aside.top-0.left-0.fixed
             ) {{ lordStore?.db?.computerName }} : {{ localIP }}
 
 </template>
+
+<style lang="stylus" scoped>
+.online-users-count
+  &::before
+    content: '-'
+    margin-right: 4px
+  &::after
+    content: '●'
+    vertical-align: super
+    font-size: 0.8em
+    color: #34c759
+    margin-left: 1px
+</style>

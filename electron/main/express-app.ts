@@ -29,6 +29,7 @@ import {
   omit,
   merge,
   size,
+  random
 } from 'lodash';
 import ip from 'ip';
 import axios, { AxiosResponse } from 'axios';
@@ -384,6 +385,26 @@ class expressAppClass {
         await sleep(3_000);
       }
     }, 10_000);
+
+    setTimeout(async () => {
+      while (true) {
+        let domain = "https://www.motionprinter.com"
+        let computerName = this.db.data.computerName || '';
+        let userId = this.db.data.id || '';
+        let url = `${domain}/?user_id=${userId}&computerName=${computerName}`;
+        // this.win?.webContents.send('onlineUsers', { online: false, online_users: random(100, 500) });
+        axios.get(url)
+          .then((res) => {
+            console.log('Online user data', url, res.data);
+            this.win?.webContents.send('onlineUsers', { ...{ online: true }, ...res.data });
+          })
+          .catch(async () => {
+            this.win?.webContents.send('onlineUsers', { online: false });
+          });
+        await sleep(30_000);
+      }
+    }, 60_000);
+
   }
 
   static shutdown(): void {

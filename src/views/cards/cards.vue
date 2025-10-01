@@ -119,6 +119,7 @@ function resetCreatedPDF() {
   if (page.value?.pdfs?.length && page.value?.outputFile) {
     page.value.outputFile = null;
     page.value.filename = '';
+    saveToMain();
   }
 }
 
@@ -458,6 +459,8 @@ const disabledUploadFile = (field: RepeaterItem) => {
       RocketIcon.h-4.w-4(v-else)
       AlertTitle {{ message }}
       AlertDescription(v-if="messageFile") {{ messageFile }}
+      AlertDescription(v-else) 
+        Skeleton(class="w-[210px] h-4 rounded-none mt-2")
 
     .bg-yellow-100.border-l-4.border-yellow-500.text-yellow-700.p-4.rounded-md(
       v-if="messageWarning"
@@ -472,8 +475,8 @@ const disabledUploadFile = (field: RepeaterItem) => {
     )
       .select-container.w-40.place-self-end
         Label.mb-1(for="cardType") Card Type 
-        Select#cardType(@update:modelValue="(value: string) => onSelectChange(value, index)")
-          SelectTrigger.p-5
+        Select#cardType(@update:modelValue="(value: string) => onSelectChange(value, index)" )
+          SelectTrigger.p-5()
             SelectValue(placeholder="Select the Card")
           SelectContent
             SelectItem(
@@ -512,6 +515,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
           @change="(e: Event) => handlePasswordChange(e, index, field)"
           placeholder="PDF Password"
           class="border rounded-lg text-sm w-full"
+          
         )
 
       
@@ -557,6 +561,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
           type="file"
           accept="image/*"
           class="border rounded-lg text-sm m-0 p-0 sm:w-full sm:max-w-full"
+          
         )
 
       Button.place-self-end(
@@ -565,29 +570,30 @@ const disabledUploadFile = (field: RepeaterItem) => {
       ) #[Trash2.py-1] Remove
 
   .flex.gap-3.mt-8.flex-wrap
-    Button(@click="addRepeaterField" variant="outline" :disabled="isProcessing") #[Plus.py-1.m-0.-ml-2] Add New Card
+    Button(@click="addRepeaterField" variant="outline" :disabled="isProcessing") #[Plus.m-0.-ml-2] Add New Card
     Button(@click="resetFields" variant="destructive" class="border border-gray-300" ) 
-      | #[RotateCcw.px-1.-ml-1] Reset All
+      | #[RotateCcw.-ml-1] Reset All
     Button(@click="onCreate" variant="default")
-      | #[FileText.px-1.-ml-1] {{ page?.outputFile ? 'Re-create PDF' : 'Create PDF' }}
+      | #[Loader2.w-4.h-4.-ml-1.animate-spin(v-if="isProcessing && false")] #[FileText.-ml-1(v-else)] {{ page?.outputFile ? 'Re-create PDF' : 'Create PDF' }}
     Button(
       @click="onDownload"
       v-if="page?.outputFile"
       variant="outline"
       class="bg-green-400 text-white"
-    ) #[Download.px-1.-ml-1] Download PDF
+      
+    ) #[Download.-ml-1] Download PDF
     Button(
       @click="onPrint()"
       v-if="page?.outputFile"
       variant="outline"
       class="bg-slate-600 text-white"
-    ) #[Printer.py-1.-ml-1] Print 
+    ) #[Printer.-ml-1] Print 
     Button(
       @click="onMakeNewPDF()"
       v-if="page?.outputFile"
       variant="outline"
       class="bg-blue-600 text-white"
-    ) #[Printer.py-1.-ml-1] New PDF
+    ) #[Printer.-ml-1] New PDF
 
   .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF

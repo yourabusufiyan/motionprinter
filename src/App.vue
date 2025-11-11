@@ -3,11 +3,8 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
 .app
   Sidebar
   .ml-64.min-h-screen.flex.flex-col
-    Header
-    main.flex-1.flex.justify-between.flex-col.bg-white
-      .router-container.flex-1
-        <router-view/>
-      Footer
+    main.bg-white(class="dark:bg-slate-950")
+      <router-view/>
 
 AlertDialog(v-model:open="isAlertOpen")
   AlertDialogContent

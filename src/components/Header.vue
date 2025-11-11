@@ -10,7 +10,7 @@ const { t, availableLocales, locale } = useI18n();
 
 <template lang="pug">
 header.header.bg-slate-100.border-b.shadow-sm.shadow-slate-900(
-  class="dark:bg-slate-800 dark:text-slate-200 dark:border-slate-400 dark:shadow-slate-200"
+  class="dark:bg-slate-950 dark:text-slate-200 dark:border-slate-400 dark:shadow-slate-200"
 )
   .container.py-4.flex.items-center.justify-between
     h2.text-lg {{ route.meta.title }}

@@ -55,6 +55,7 @@ type cardType =
   | 'custom'
   | 'aadhaar'
   | 'abc_apaar'
+  | 'apaar'
   | 'abha'
   | 'ayushman'
   | 'csc_id'
@@ -62,6 +63,7 @@ type cardType =
   | 'nielit_student_id'
   | 'pan'
   | 'voter_new'
+  | 'ration'
   | null;
 
 interface RepeaterItem {
@@ -97,9 +99,11 @@ const options = ref(
     { label: 'Ayushman Card', value: 'ayushman' },
     { label: 'Pan Card', value: 'pan' },
     { label: 'Voter ID(New/e-EPIC) Card', value: 'voter_new' },
-    { label: 'ABC / APAAR CARD', value: 'abc_apaar' },
+    { label: 'ABC', value: 'abc_apaar' },
+    { label: 'APAAR', value: 'apaar' },
     { label: 'CSC ID Card', value: 'csc_id' },
     { label: 'NIELIT Student ID Card', value: 'nielit_student_id' },
+    { label: 'Ration Card', value: 'ration' },
   ].sort((a, b) => {
     if (b.value == 'custom') return 1;
     return a.label.localeCompare(b.label);
@@ -597,7 +601,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
 
   .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF
-    .card-container
+    .card-container(v-if="!page?.outputFile")
       .flex.items-center.justify-center.gap-4.mb-4(v-for="card in page?.pdfs?.filter(isObject)" :key="card.id")
         .card-front.flex-1.border.border-gray-200.rounded-lg.min-h-32.max-h-64.relative
           .download-icon.absolute.top-0.right-0.bg-black.text-white.p-2.transition-all.ease-out.opacity-20(
@@ -643,6 +647,13 @@ const disabledUploadFile = (field: RepeaterItem) => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
+    .card-container(v-if="page?.outputFile")
+      embed(
+        :src="`http://${lordStore.db.ip}:9457/upload/${page?.filename}`"
+        type="application/pdf",
+        width="100%",
+        height="600px"
+      )
 pre {{ page }}
 </template>
 

@@ -331,6 +331,7 @@ onMounted(async () => {
       role="form",
       method="post",
       enctype="multipart/form-data"
+      class="dark:bg-gray-800 dark:text-white"
     )
       .w-full.text-center
         p.block.py-16.w-full.cursor-not-allowed(v-if="isFileUploading") Processing to print the file....
@@ -356,7 +357,7 @@ Dialog(v-model:open="isDialogOpen")
     )
         .flex.justify-between.max-w-full.max-w-full.overflow-hidden
 
-          .preview-content-container.overflow-auto.bg-neutral-300.w-full
+          .preview-content-container.overflow-auto.bg-neutral-300.w-full(class="dark:bg-gray-800")
             .preview-content.flex.justify-center.my-4.shadow-sm.flex-col.items-center
               pre.hidden {{ pages == 'custom' ? 'df' : true }}
               pre.hidden selectedComputer : {{ selectedComputer }}
@@ -370,16 +371,16 @@ Dialog(v-model:open="isDialogOpen")
           .options-content-container.min-w-52.mt-0.border-l-2.flex.justify-between.flex-col(
             class="md:min-w-60 lg:min-w-64 xl:min-w-64"
           )
-            .options-title-container.p-2.pb-0.flex.justify-between.w-full
+            .options-title-container.p-2.pb-0.flex.justify-between.w-full(class="dark:text-white")
               h1.title.text-xl Print
               p.text-right {{ pdfPages }} page(s)
             .border-t.mx-3.my-1.mt-2.border-gray-400
 
             .max-h-screen.overflow-y-auto.flex-1
               .computer-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Computers
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Computers
                 Select(v-model="selectedComputer")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Computer')
                   SelectContent
                       SelectItem(
@@ -390,9 +391,9 @@ Dialog(v-model:open="isDialogOpen")
                       ) {{ computer.computerName }} {{ computer.isConnected ? '' : ' : Offline' }}
 
               .printer-select-container.block.p-2( v-if="selectedComputer" )
-                p.text-sm.text-black.mb-2 Printers
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Printers
                 Select(v-model="selectedPrinter")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Printer')
                   SelectContent
                       SelectItem(
@@ -402,12 +403,13 @@ Dialog(v-model:open="isDialogOpen")
                       ) {{ printer.name }} {{ printer.name == selectedComputer?.defaultPrinter?.name ? ' : Default' : ''}}
 
               .copies-select-container.block.p-2
-                Label.text-sm.text-black.mb-2.block.font-normal Copies
+                Label.text-sm.text-black.mb-2.block.font-normal(class="dark:text-slate-300") Copies
                 NumberField.w-20(
                   v-model="copies"
                   :min="1"
                   :max="100"
                   :step="1"
+                  class="dark:text-slate-200 dark:bg-slate-900 "
                 )
                   NumberFieldContent
                     NumberFieldDecrement(class="p-3")
@@ -417,9 +419,9 @@ Dialog(v-model:open="isDialogOpen")
                       PlusIcon.h-3.w-3
 
               .pages-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Pages
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Pages
                 Select(v-model="pages")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a page(s)')
                   SelectContent
                     SelectItem( value="all" ) All
@@ -439,9 +441,9 @@ Dialog(v-model:open="isDialogOpen")
                 ) {{ rangeErrorMessage }}
 
               .colorMode-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Color Mode
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Color Mode
                 Select(v-model="colorMode" default-value="black_and_white")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Printer')
                   SelectContent
                       SelectItem( value="color" ) Color
@@ -449,7 +451,7 @@ Dialog(v-model:open="isDialogOpen")
 
               .border-t.mt-2.border-gray-400( class="w-[90%] mx-auto" )
 
-              Accordion(type="single" collapsible)
+              Accordion(type="single" collapsible class="dark:text-slate-200")
                 AccordionItem( value="item-1"  class="border-none" )
                   AccordionTrigger(
                     class="max-w-[90%] mx-auto"
@@ -457,15 +459,15 @@ Dialog(v-model:open="isDialogOpen")
                   AccordionContent
 
                     .paperSizes-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Paper Size
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-300") Paper Size
                       Select(v-model="paperSizes" default-value="a4")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Select a Printer')
                         SelectContent
                             SelectItem( v-for="(value, key) in paperSizesData" :key="key" :value="key" ) {{ value }}
 
                     .scale-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Scale
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Scale
                       RadioGroup( v-model="scale" default-value="fit")
                         .flex.items-center.space-x-2
                           RadioGroupItem#fit(value="fit")
@@ -494,9 +496,9 @@ Dialog(v-model:open="isDialogOpen")
                           label.cursor-pointer(for="noscale") No scale
 
                     .pagePerSheet-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Paper per sheet
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Paper per sheet
                       Select(v-model="paperPerSheet", defaultValue="1")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Paper per sheet')
                         SelectContent
                             SelectItem( value="1" ) 1
@@ -507,9 +509,9 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="16" ) 16
 
                     .margin-select-container.block.p-2.hidden
-                      p.text-sm.text-black.mb-2 Margin
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Margin
                       Select(v-model="margin", defaultValue="default")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Select a Printer')
                         SelectContent
                             SelectItem( value="default" ) Default
@@ -518,9 +520,9 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="custom" ) Custom (mm)
 
                     .towSidedPrinting-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Two-sided printing
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Two-sided printing
                       Select(v-model="towSidedPrinting", defaultValue="simplex")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Paper per sheet')
                         SelectContent
                             SelectItem( value="simplex" ) Off
@@ -528,7 +530,7 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="duplexshort" ) Flip on short edge
 
             .bottom-0.bg-white.width-full.max-w-full
-              .button-container.flex.justify-end.gap-3.p-3.bg-white.border-t.border-1
+              .button-container.flex.justify-evenly.gap-3.p-3.bg-white.border-t.border-1( class="dark:bg-gray-900 dark:border-gray-700" )
                 uiButton( class="md:px-8" @click="handlePrint()" :disabled="pages == 'custom' ? !isRangeValid : !true" ) Print
                 uiButton( variant="secondary" class="md:px-8" @click="handleCancel()" ) Cancel
 

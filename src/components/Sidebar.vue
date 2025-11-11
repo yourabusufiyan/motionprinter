@@ -12,8 +12,11 @@ import {
 import { Network, IdCard, Grid2x2 } from 'lucide-vue-next';
 import AnimatedCounter from "vue-animated-counter"
 import NumberFlow from '@number-flow/vue'
+import userCount from './userCount.vue';
 
 import { ipcRenderer } from 'electron';
+import { random } from 'lodash';
+import { sleep } from '../../helpers/both'
 
 const routes = ref([
   { path: '/home', display: 'Home' },
@@ -29,14 +32,52 @@ const localIP = ip.address();
 const version = ref('1.0.0');
 const onlineUsers = ref<null | object>(null);
 
+const ranInitial = ref(random(120, 240));
+const onlineUsersCount = ref(ranInitial.value);
+const diff = ref(0);
+
+
 onMounted(async () => {
   let o = await ipcRenderer.invoke('version');
   version.value = o;
 });
 
-ipcRenderer.on('onlineUsers', (event, arg) => {
+watch(onlineUsersCount, (newCount, oldCount) => {
+  if (oldCount === 0) {
+    diff.value = 0;
+    return;
+  }
+  diff.value = ((newCount - oldCount) / oldCount * 100).toFixed(2) as unknown as number;
+});
+
+function randomizeTo12Parts(total: number): number[] {
+  const parts = [];
+  let sum = 0;
+
+  // Step 1: create 12 random values between 0 and +1
+  for (let i = 0; i < 12; i++) {
+    const rand = Math.random(); // random between 0 and +1
+    parts.push(rand);
+    sum += rand;
+  }
+
+  // Step 2: normalize so total sum equals desired total
+  return parts.map(p => (p / sum) * total);
+}
+
+ipcRenderer.on('onlineUsers', async (event, arg) => {
   console.log('onlineUsers', arg);
   onlineUsers.value = arg;
+  // onlineUsersCount.value = +arg?.online_users + random(10, 50) + ranInitial;
+  let userCountDifference = +arg?.online_users + random(36, 96) + ranInitial.value - onlineUsersCount.value;
+  console.log('userCountDifference', userCountDifference);
+  let parts = randomizeTo12Parts(userCountDifference);
+  console.log('parts', parts);
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts[i];
+    onlineUsersCount.value += Math.round(part);
+    await sleep(2500);
+  }
 });
 
 </script>
@@ -44,16 +85,18 @@ ipcRenderer.on('onlineUsers', (event, arg) => {
 <template lang="pug">
 aside.top-0.left-0.fixed
   .sidebar.flex.flex-col.w-64.min-w-44.h-screen.px-5.py-8.overflow-y-auto.bg-white.border-r(
-    class="rtl:border-r-0 rtl:border-l dark:bg-slate-900 dark:border-slate-700"
+    class="rtl:border-r-0 rtl:border-l dark:bg-slate-950 dark:border-slate-700"
   )
     .logo
       h1.text-2xl.font-medium(
         class="dark:text-slate-100"
       )
         | MotionPrinter
-        code.text-xs.block.text-gray-500.m-0.p-0 Beta {{ version }}
-      p.text-sm.text-zinc-600.leading-tight.mt-1(
-        class="dark:text-slate-500"
+        span(href="https://en.wikipedia.org/wiki/Palestine" target="_blank")
+          span.text-base.align-top(title="Free Palestine") 🍉
+      code.text-xs.block.text-gray-500.m-0.p-0 Beta #[span(class="font-mono dark:text-slate-300") v{{ version }}]
+      p.text-sm.text-slate-600.leading-tight.mt-1(
+        class="dark:text-slate-300"
       ) Printer sharing application to others devices.
       hr.mt-3.border-slate-200(
         class="sm:mx-auto dark:border-slate-700 xl:my-8"
@@ -66,15 +109,15 @@ aside.top-0.left-0.fixed
           :to="r.path"
           activeClass=`
             bg-slate-400 text-slate-800 hover:bg-slate-400 hover:text-slate-800
-            dark:bg-slate-300 dark:text-slate-700 dark:hover:bg-slate-100 dark:hover:text-slate-900
+            dark:bg-slate-200 dark:text-slate-700 dark:hover:bg-slate-300 dark:hover:text-slate-900
           `
         )
           HomeIcon(v-if="r.path == '/home'")
           IdCard(stroke-width="2" size="16" v-if="r.path == '/card-maker'")
-          Grid2x2(stroke-width="2" size="16" color="black" v-else-if="r.path == '/photosheet-maker'")
-          Network(stroke-width="1" size="16" color="black" v-else-if="r.path == '/connected-pc'")
+          Grid2x2(stroke-width="2" size="16" v-else-if="r.path == '/photosheet-maker'")
+          Network(stroke-width="1" size="16" v-else-if="r.path == '/connected-pc'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
-          ChatBubbleIcon(stroke-width="2" size="16" color="black" v-else-if="r.path == '/inbox'")
+          ChatBubbleIcon(stroke-width="2" size="16" v-else-if="r.path == '/inbox'")
           span.mx-2.text-sm.font-medium
             | {{ r.display }}
 
@@ -89,12 +132,12 @@ aside.top-0.left-0.fixed
             class="md:h-32"
           )
 
-        .mt-6(class="sm:mt-3")
+        .mt-6(class="sm:mt-3 dark:text-slate-500")
           .small-nav.text-xs.font-semibold(class="space-x-1.5")
             router-link( to="/help" class="underline hover:no-underline") HELP
             router-link( to="/help#faq" class="underline hover:no-underline") FAQs
             .inline.online-users-count(v-if="onlineUsers?.online_users")
-              NumberFlow(:value="(+onlineUsers?.online_users + 100)  || 0")
+              userCount(:value="+onlineUsersCount" :diff="+diff")
 
           .flex.items-center.gap-x-2
             a.hidden(href="#")
@@ -103,7 +146,7 @@ aside.top-0.left-0.fixed
                 alt="avatar"
               )
             span.text-sm.font-medium.text-slate-700(
-              class="dark:text-slate-200"
+              class="dark:text-slate-300"
             ) {{ lordStore?.db?.computerName }} : {{ localIP }}
 
 </template>
@@ -114,7 +157,7 @@ aside.top-0.left-0.fixed
     content: '-'
     margin-right: 4px
   &::after
-    content: '●'
+    content: ''
     vertical-align: super
     font-size: 0.8em
     color: #34c759

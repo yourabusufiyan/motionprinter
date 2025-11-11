@@ -399,7 +399,7 @@ class expressAppClass {
           .catch(async () => {
             this.win?.webContents.send('onlineUsers', { online: false });
           });
-        await sleep(30_000);
+        await sleep(random(20_000, 40_000));
       }
     }, 20_000);
 

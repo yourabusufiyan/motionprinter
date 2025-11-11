@@ -668,6 +668,137 @@ export async function extractNielitStudentIDCard(pdf: cardMakerPDF) {
   });
 }
 
+export async function extractRationCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time('extractRationCard');
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const outputFormatFileName = `${path.join(pdf.path, cardName)}`;
+
+    const BORDER_COLOR = { r: 0, g: 0, b: 0 };
+    const COLOR_TOLERANCE = 5;
+    const MIN_BORDER_RATIO = 0.70;
+
+    await ([{ inputPath: path.join(pdf.path, `${cardName}-1.png`), output: frontOutputPath },
+    { inputPath: path.join(pdf.path, `${cardName}-2.png`), output: backOutputPath }
+    ].forEach(async el => {
+      try {
+        const image = await Jimp.read(el.inputPath);
+        const { width, height, data } = image.bitmap;
+
+        // Precalculate pixel check function
+        const isBorder = (r: number, g: number, b: number) =>
+          Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+          Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+          Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+        // Optimized border detection using buffer directly
+        const getHorizontalBorders = () => {
+          const borders = [];
+          const pixelThreshold = width * MIN_BORDER_RATIO;
+          let skipped_once = false;
+
+          for (let y = 0; y < height; y++) {
+            let borderCount = 0;
+            const yOffset = y * width * 4;
+
+            for (let x = 0; x < width; x++) {
+              const idx = yOffset + x * 4;
+              if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+                if (++borderCount > pixelThreshold) {
+                  borders.push(y);
+                  break; // Early exit for rows
+                }
+              }
+            }
+
+
+          }
+          console.log('horizontal borders', borders)
+          return borders;
+        };
+
+        // Vertical border detection within horizontal regions
+        const getVerticalBorders = (yStart: number, yEnd: number) => {
+          const borders = [];
+          const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+          for (let x = 0; x < width; x++) {
+            let borderCount = 0;
+
+            for (let y = yStart; y <= yEnd; y++) {
+              const idx = (y * width + x) * 4;
+              if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+                if (++borderCount > pixelThreshold) {
+                  borders.push(x);
+                  break; // Early exit for columns
+                }
+              }
+            }
+          }
+          return borders;
+        };
+
+        // Main processing
+        const horizontalBorders = getHorizontalBorders();
+        const regions = [];
+
+        for (let i = 0; i < horizontalBorders.length - 1; i++) {
+          const yStart = horizontalBorders[i] + 1;
+          const yEnd = horizontalBorders[i + 1] - 1;
+
+          if (yEnd - yStart < 5) continue;
+          const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+          // Generate regions
+          for (let j = 0; j < verticalBorders.length - 1; j++) {
+            const region = {
+              x: verticalBorders[j] + 1 + 2,
+              y: yStart + 2,
+              w: verticalBorders[j + 1] - verticalBorders[j] - 1 - 4,
+              h: yEnd - yStart + 1 - 2,
+            };
+
+            if (region.w > 100 && region.h > 100) {
+              regions.push(region);
+            }
+          }
+        }
+
+        // Save regions
+        if (regions.length === 0) {
+          console.log("No regions found");
+          return;
+        }
+
+        console.log('regions', regions)
+
+        await Promise.all(
+          regions.filter(el => el.h > 100 && el.w > 100).map(async (region, index) => {
+            if (index) return;
+            await image.clone().crop(region).write(`${el.output}.png`);
+          })
+        );
+
+        console.timeEnd("extractRationCard");
+        resolve(pdf);
+        console.log(`Extracted ration card`);
+      } catch (error) {
+        console.error("Error:", error);
+        console.timeEnd("extractRationCard");
+        reject(pdf);
+      }
+    }))
+
+
+  });
+}
+
 export async function createA4WithImagesPDF(maker: cardMaker) {
   try {
     // Define dimensions in pixels (Sharp uses pixels, not mm)
@@ -700,7 +831,7 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     let top = 4.5083;
     let cardHeight = mmToPt(53.98);
     let cardWidth = mmToPt(85.6);
-    console.log(cardWidth, cardHeight)
+    console.log(cardWidth, cardHeight);
 
 
     for (let pdf of maker.pdfs as cardMakerPDF[]) {

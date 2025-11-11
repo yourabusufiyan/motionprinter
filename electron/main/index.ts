@@ -34,6 +34,7 @@ import {
   extractAadhaarCard,
   extractPanCard,
   extractNielitStudentIDCard,
+  extractRationCard,
 } from '../helpers/cardmakers';
 import { writer } from 'repl';
 
@@ -741,7 +742,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
             }
             event.reply('cardMaker-failure', { page, card });
           });
-      } else if (['aadhaar', 'pan', 'nielit_student_id'].includes(card?.cardType as string)) {
+      } else if (['aadhaar', 'pan', 'nielit_student_id', 'ration'].includes(card?.cardType as string)) {
         console.log('aadhaar', card);
 
         pdf2image(card)
@@ -767,6 +768,8 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                 await extractAadhaarCard(card);
               } else if (card?.cardType == 'nielit_student_id') {
                 await extractNielitStudentIDCard(card);
+              } else if (card?.cardType == 'ration') {
+                await extractRationCard(card);
               } else if (card?.cardType == 'pan') {
                 card.cardFront = `${cardName}-front.png`;
                 const frontOutputPath = path.join(card.path, card.cardFront);

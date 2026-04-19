@@ -283,6 +283,8 @@ const onCreate = () => {
     messageFile.value = ''
     isProcessing.value = true;
     isDataToProcess.value = false;
+    page.value.outputFile = null;
+    page.value.filename = '';
     ipcRenderer.send('cardMakerCreatePDF', cloneDeep(page.value));
   }
 };
@@ -457,6 +459,18 @@ const onMakeNewPDF = async () => {
               Skeleton.h-3.w-full
               Skeleton.h-3(class="w-[90%]")
               Skeleton.h-3(class="w-[85%]")
+<<<<<<< Updated upstream
+=======
+    .card-container(v-if="page?.filename")
+      embed(
+        v-if="page?.filename"
+        :src="`http://${lordStore.db.ip}:9457/upload/${page?.filename}`"
+        type="application/pdf",
+        width="100%",
+        height="600px"
+      )
+pre {{ page }}
+>>>>>>> Stashed changes
 </template>
 
 <style lang="stylus" scoped>

@@ -50,6 +50,16 @@ const preload = path.join(__dirname, '../preload/index.js');
 const url = process.env.VITE_DEV_SERVER_URL;
 const indexHtml = path.join(process.env.DIST, 'index.html');
 
+<<<<<<< Updated upstream
+=======
+
+const dir = [
+  path.join(os.homedir(), app.getName(), '/public/'),
+  path.join(os.homedir(), app.getName(), '/upload/pdf/'),
+  path.join(os.homedir(), app.getName(), '/upload/image/'),
+  path.join(os.homedir(), app.getName(), '/db/'),
+];
+>>>>>>> Stashed changes
 
 const dir = [
   path.join(os.homedir(), app.getName(), "/public/"),
@@ -79,7 +89,7 @@ async function createWindow() {
   }
 
   win = new BrowserWindow({
-    title: 'Main window',
+    title: 'MotionPrinter',
     icon: path.join(process.env.PUBLIC, 'favicon.ico'),
     width: 1220,
     height: 600,

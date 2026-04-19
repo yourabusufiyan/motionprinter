@@ -1,5 +1,6 @@
 <template lang="pug">
 Toaster(class="pointer-events-auto" :expand="false" richColors)
+<<<<<<< Updated upstream
 .app
   Sidebar
   .ml-64.min-h-screen.flex.flex-col
@@ -8,6 +9,12 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
       .router-container.flex-1
         <router-view/>
       Footer
+=======
+Sidebar
+.ml-64.min-h-screen.flex.flex-col
+  main.bg-white(class="dark:bg-slate-950")
+    <router-view/>
+>>>>>>> Stashed changes
 
 AlertDialog(v-model:open="isAlertOpen")
   AlertDialogContent
@@ -23,8 +30,12 @@ AlertDialog(v-model:open="isAlertOpen")
 </template>
 
 <script setup lang="ts">
+<<<<<<< Updated upstream
 console.log('[App.vue]', `Hello world from Electron ${process.env.npm_package_version}!`);
 console.log('[App.vue]', `App.vue started successfully`);
+=======
+console.log('[App.vue]', `MotionPrinter v${process.env.npm_package_version}!`,);
+>>>>>>> Stashed changes
 
 import Sidebar from './components/Sidebar.vue';
 import Header from './components/Header.vue';

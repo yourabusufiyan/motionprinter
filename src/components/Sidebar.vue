@@ -7,7 +7,12 @@ import { HomeIcon, CountdownTimerIcon, TokensIcon, ChatBubbleIcon } from '@radix
 import { Network, IdCard, Grid2x2 } from 'lucide-vue-next';
 
 import { ipcRenderer } from 'electron';
+<<<<<<< Updated upstream
+=======
+import { random } from 'lodash';
+>>>>>>> Stashed changes
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const routes = ref([
   { path: '/home', display: 'Home' },
   { path: '/card-maker', display: 'Card Maker' },
@@ -16,16 +21,81 @@ const routes = ref([
   { path: '/history', display: 'History' },
 ])
 
+<<<<<<< Updated upstream
 const route = useRoute()
 const lordStore = useLordStore()
 const localIP = ip.address()
 const version = ref('1.0.0')
+=======
+const route = useRoute();
+const lordStore = useLordStore();
+const localIP = ip.address();
+const version = ref('1.0.0');
+const onlineUsers = ref<null | object>(null);
+
+const ranInitial = ref(1);
+const onlineUsersCount = ref(ranInitial.value);
+const diff = ref(0);
+>>>>>>> Stashed changes
 
 
 onMounted(async () => {
   let o = await ipcRenderer.invoke('version')
   version.value = o;
+<<<<<<< Updated upstream
 })
+=======
+});
+
+watch(onlineUsersCount, (newCount, oldCount) => {
+  if (oldCount === 0) {
+    diff.value = 0;
+    return;
+  }
+  diff.value = ((newCount - oldCount) / oldCount * 100).toFixed(2) as unknown as number;
+});
+
+function randomizeTo12Parts(total: number): number[] {
+  const parts = [];
+  let sum = 0;
+
+  // Step 1: create 12 random values between 0 and +1
+  for (let i = 0; i < 12; i++) {
+    const rand = Math.random(); // random between 0 and +1
+    parts.push(rand);
+    sum += rand;
+  }
+
+  // Step 2: normalize so total sum equals desired total
+  return parts.map(p => (p / sum) * total);
+}
+
+ipcRenderer.on('onlineUsers', async (event, arg) => {
+
+  console.log('onlineUsers', arg);
+  onlineUsers.value = arg;
+  // onlineUsersCount.value = +arg?.online_users + random(10, 50) + ranInitial;
+  let userCountDifference = +arg?.online_users - onlineUsersCount.value;
+  console.log('userCountDifference', userCountDifference);
+
+  if (userCountDifference < 0) return;
+
+  if (userCountDifference > 12) {
+    let parts = randomizeTo12Parts(userCountDifference);
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      onlineUsersCount.value += Math.round(part);
+      await sleep(2500);
+    }
+  } else {
+    for (let i = 0; i < userCountDifference; i++) {
+      onlineUsersCount.value += i;
+      await sleep(Math.round(30_000 / (userCountDifference + 1)));
+    }
+  }
+});
+
+>>>>>>> Stashed changes
 </script>
 
 <template lang="pug">
@@ -81,6 +151,11 @@ aside.top-0.left-0.fixed
           .small-nav.text-xs.font-semibold(class="space-x-1.5")
             router-link( to="/help" class="underline hover:no-underline") HELP
             router-link( to="/help#faq" class="underline hover:no-underline") FAQs
+<<<<<<< Updated upstream
+=======
+            .inline.online-users-count(v-if="onlineUsersCount")
+              userCount(:value="+onlineUsersCount" :diff="+diff")
+>>>>>>> Stashed changes
 
           .flex.items-center.gap-x-2
             a.hidden(href="#")

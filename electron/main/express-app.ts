@@ -192,7 +192,11 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
+<<<<<<< Updated upstream
 
+=======
+        
+>>>>>>> Stashed changes
         if (ip.address() != this.ip) {
           console.log('Changed IP, reloading server')
           app.relaunch({ args: process.argv.slice(1).concat(['--relaunch']) })

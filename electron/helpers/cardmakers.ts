@@ -423,6 +423,19 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     const writeStream = fs.createWriteStream(maker.outputFile as string);
     doc.pipe(writeStream);
 
+<<<<<<< Updated upstream
+=======
+    // Get page width and height
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const middleX = pageWidth / 2; // Vertical line in the middle
+
+    let count = 0;
+    let top = 2.2541; // 4.5083;
+    let cardHeight = mmToPt(53.98);
+    let cardWidth = mmToPt(85.6);
+    console.log(cardWidth, cardHeight);
+>>>>>>> Stashed changes
 
     let count = 0
     // let margin = 10
@@ -432,7 +445,11 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
 
       if (count === 5) {
         doc.addPage(); // Add a new page
+<<<<<<< Updated upstream
         top = 3.136
+=======
+        top = 2.2541; // 4.5083;
+>>>>>>> Stashed changes
         count = 0;
       }
 

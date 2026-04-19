@@ -22,9 +22,20 @@ import PhotoItem from './PhotoItem.vue'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@/components/ui/dropdown-menu"
 
+<<<<<<< Updated upstream
 import { Loader2 } from 'lucide-vue-next'
 import axios from 'axios'
+=======
+import { Loader2, FileText, Image as ImageIcon, Download, Printer } from 'lucide-vue-next';
+import axios from 'axios';
+>>>>>>> Stashed changes
 import { ipcRenderer } from 'electron';
 import { cloneDeep, isNull, isUndefined, merge } from 'lodash';
 import { useLordStore } from '@/stores/LordStore';
@@ -38,6 +49,7 @@ const lordStore = useLordStore();
 const currentPage = ref<$photoSheet>({
   id: uuidv7().split('-').slice(0, 3).join(''),
   photos: [],
+<<<<<<< Updated upstream
 })
 const pages = ref<$photoSheet[]>([{ id: '', photos: [] }])
 const currentPageIndex = ref(0)
@@ -55,6 +67,25 @@ const rotationStartAngle = ref(0)
 const initialRotation = ref(0)
 const selectedCellIndex = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+=======
+});
+const pages = ref<$photoSheet[]>([{ id: '', photos: [] }]);
+const currentPageIndex = ref(0);
+const selectedGrid = ref('6x7');
+const selectedPaperSize = ref('a4');
+const pageMargin = ref(3);
+const cellWidth = ref(50);
+const cellHeight = ref(50);
+const cellGap = ref(3);
+const cellBorder = ref(1);
+const cellBorderColor = ref('rgb(0, 0, 0)');
+const paperZoom = ref(1);
+const isRotating = ref(false);
+const rotationStartAngle = ref(0);
+const initialRotation = ref(0);
+const selectedCellIndex = ref<number | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+>>>>>>> Stashed changes
 const pdfContent = ref<HTMLElement | null>(null);
 const isPrinting = ref(false);
 const isPdfDownloading = ref(false);
@@ -299,9 +330,13 @@ const updateDimensions = () => {
   }
 };
 
+<<<<<<< Updated upstream
 
 const doAction = async (printPDF: boolean = false) => {
 
+=======
+const doAction = async (printPDF: boolean = false, saveAs: string = 'pdf') => {
+>>>>>>> Stashed changes
   if (!pdfContent.value) {
     console.error('Element not found', pdfContent.value);
     return;
@@ -328,12 +363,14 @@ const doAction = async (printPDF: boolean = false) => {
   `;
 
   console.log('printPDF', printPDF);
+  console.log('saveAs', saveAs);
 
   isPdfDownloading.value = printPDF
   isPrinting.value = !printPDF
 
   let obj = {
     head,
+    saveAs,
     htmlContent: pdfContent.value.innerHTML,
     printPDF: printPDF,
     isPrint: !printPDF,
@@ -370,7 +407,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
 
 <template lang="pug">
 .parent-container.flex.w-full.overflow-hidden
-  .scroll-container.left-container.flex-1.bg-blue-200
+  .scroll-container.left-container.flex-1.bg-blue-200.shadow-lg.shadow-inner
     .paper-container.flex.justify-center.items-center
       .paper-sheet.bg-white.shadow-lg.mx-auto(:style="paperStyle" ref="pdfContent" @wheel="handlePaperZoom")
         .grid-container.text-center( :style="[gridStyle]")
@@ -410,11 +447,11 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
       p.text-sm Photo Size : 
       p.font-sm.hidden {{CellWidth}} #[span.font-bold x] {{CellHeight}}(px)
       p.text-sm {{parseFloat(CellWidth*0.2645833333).toFixed(2)}} #[span.font-bold x] {{parseFloat(CellHeight*0.2645833333).toFixed(2)}}(mm)
-    ScrollArea.flex-1.px-6.shadow-inner.shadow-sm.border-y
+    ScrollArea.flex-1.shadow-inner.shadow-sm.border-y
       Accordion(:default-value="defaultAccordion" type="multiple")
         AccordionItem(value="options")
-          AccordionTrigger.text-lg Page Options
-          AccordionContent.space-y-4.w-full
+          AccordionTrigger.text-lg.px-6 Page Options
+          AccordionContent.space-y-4.w-full.px-6
 
             Button.hidden(@click="addNewPage" variant="outline") New Page
             Button.hidden(@click="removeCurrentPage" variant="outline" :disabled="pages.length <= 1") Remove Page
@@ -461,7 +498,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 NumberFieldInput
                 NumberFieldIncrement
 
-            NumberField#gap(v-model="cellGap" v-if="selectedGrid != '1x1'" :min="0" :max="20")
+            NumberField#gap(v-model="cellGap" v-if="selectedGrid != '1x1'" :min="0" :max="50")
               Label(for="gap") Gap
               NumberFieldContent
                 NumberFieldDecrement
@@ -484,37 +521,48 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
                 )
 
         AccordionItem(value="grids")
-          AccordionTrigger.text-lg Layouts
+          AccordionTrigger.text-lg.px-6 Layouts
           AccordionContent.bg-gray-50.py-4
-            .space-y-4.mx-6.shadow-sm( :style="{ aspectRatio: '210/297' }")
-              .grid-container.bg-white.text-center.w-full.border.border-2.p-1(
-                v-for="layout in gridLayouts"
-                @click.prevent="selectedGrid = layout.value"
-                :class=`{"border-slate-500" : selectedGrid == layout.value}`
-                :style="gridStyleFunc(layout.value, '1mm')"
-                class="hover:cursor-pointer"
-              )
-                Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
+            .flex.flex-wrap.gap-3.align-center.justify-center.p-2
+              .div(class="basis-[calc(50%-0.75rem)]" v-for="layout in gridLayouts" :key="layout.value")
+                .grid-container.bg-white.text-center.w-full.border.border-2.p-1(
+                  @click.prevent="selectedGrid = layout.value"
+                  :class=`[{"border-slate-500" : selectedGrid == layout.value}, ]`
+                  :style="[{ aspectRatio: '210/297' }, gridStyleFunc(layout.value, '1mm')]"
+                  class="hover:cursor-pointer"
+                )
+                  Skeleton(class="w-full h-full rounded animate-none" v-for="(cell, index) in gridCellsFunc(layout.value)" key="index" :key="index")
 
         .mt-4 
-        Button(@click="removeEmptyCell()" :disabled="!currentPage.photos?.length") Remove Empty Cell
+        .action-buttons.px-6
+          Button(@click="removeEmptyCell()" :disabled="!currentPage.photos?.length") Remove Empty Cell
 
     .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
-      Button.hidden.bg-slate-700(@click="doAction(false)" :disabled="isInAction || !currentPage?.photos?.length" ) 
+      Button(@click="doAction(false)" :disabled="isInAction || !currentPage?.photos?.length" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
-        | Print
-      Button(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")
+        | <Printer/> Print
+      Button.hidden(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPdfDownloading")
         | Download PDF
+      DropdownMenu
+        DropdownMenuTrigger(as-child :disabled="isInAction || !currentPage?.photos?.length")
+          Button(variant="outline")
+            span(v-if="isPdfDownloading")
+              Loader2.w-4.h-4.animate-spin 
+            span(v-else) <Download class="inline align-top mr-1"/> Save As 
+        DropdownMenuContent.w-40(align="end")
+          DropdownMenuItem(@click="doAction(false, 'pdf')") <FileText class="mr-2 h-4 w-4" /> PDF
+          DropdownMenuItem(@click="doAction(false, 'jpg')") <ImageIcon class="mr-2 h-4 w-4" /> JPG
+          DropdownMenuItem(@click="doAction(false, 'png')") <ImageIcon class="mr-2 h-4 w-4" /> PNG
 </template>
 
 <style lang="stylus" scoped>
 .parent-container
-  height calc(100vh - 111px)
+  height calc(100vh)
 
 .scroll-container
   height 100%
-  overflow-y auto
+  overflow auto
   &::-webkit-scrollbar
     width 4px
   &::-webkit-scrollbar-track
@@ -527,8 +575,13 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
 
 .paper-container
   background-color #f3f4f6
+<<<<<<< Updated upstream
   min-height calc(100vh - 111px)
   
+=======
+  min-height calc(100vh)
+
+>>>>>>> Stashed changes
 .controls
   margin-bottom 2rem
 

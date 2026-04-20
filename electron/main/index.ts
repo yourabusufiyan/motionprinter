@@ -896,6 +896,7 @@ ipcMain.on(
         contextIsolation: false,
       },
     });
+    const id: string = crypto.randomUUID().substring(0, 8);
 
     try {
       let cssFiles: string[] = [];
@@ -933,95 +934,109 @@ ipcMain.on(
 
       await sleep(500);
 
-      if (!!obj?.saveAs) {
-        console.log('Saving as ', obj.saveAs);
-        const pdfOptions = {
-          color: true,
-          margins: {
-            marginType: 'printableArea' as 'printableArea', // 'none', 'printableArea', or custom
-            top: 0,
-            bottom: 0,
-            left: 0,
-            right: 0,
-          }, // Default margins
-          pageSize: 'A4' as 'A4',
-          printBackground: true,
-          printSelectionOnly: false,
-          landscape: false,
-        };
 
+      let data: Buffer = '' as unknown as Buffer;
+      const tempFile = path.join(app.getPath('temp'), `mp-temp-${id}.pdf`);
+
+      const pdfOptions = {
+        color: true,
+        margins: {
+          marginType: 'printableArea' as 'printableArea', // 'none', 'printableArea', or custom
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+        },
+        pageSize: 'A4' as 'A4',
+        printBackground: true,
+        printSelectionOnly: false,
+        landscape: false,
+      };
+
+      data = await win.webContents.printToPDF(pdfOptions);
+
+      // Save to temp
+      fs.writeFileSync(tempFile, data);
+
+      if (!!obj?.saveAs) {
+
+        console.log('Saving as ', obj.saveAs);
         let defaultExt;
         let defaultTitle;
-        let data: Buffer = '' as unknown as Buffer;
-
-        if (obj?.saveAs == 'pdf') {
-
-          data = await win.webContents.printToPDF(pdfOptions);
-          defaultExt = '.pdf';
-          defaultTitle = "Save PDF";
-
-        } else if (obj?.saveAs == 'png' || obj?.saveAs == 'jpg') {
-
-          // 1. Capture the window's content
-          const image = await win.webContents.capturePage();
-
-          // 2. Convert to desired format
-          if (obj?.saveAs === 'jpg') {
-            data = image.toJPEG(100);
-            defaultExt = '.jpg';
-          } else {
-            data = image.toPNG(); // Lossless format with transparency
-            defaultExt = '.png';
-          }
-
-        }
 
         const { canceled, filePath } = await dialog.showSaveDialog(
           win as BrowserWindow,
           {
-            title: defaultTitle,
+            title: 'Save File',
             defaultPath: path.join(
               os.homedir(),
               'Downloads',
-              `${obj?.filename}${defaultExt}` || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}${defaultExt}`,
+              `${obj?.filename}.${obj?.saveAs}` || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.${obj?.saveAs}`,
             ),
           },
         );
 
-        if (!canceled || filePath) {
-          fs.writeFileSync(filePath, data);
-        }
+        win.close(); // There is no need to keep the window open after getting the PDF data and showing the save dialog
 
-        win.close();
-        event.reply('generate-pdf-reply', {
-          success: true,
-          message: 'Printed successfully',
-        });
-      }
-
-      if (obj?.printSheet) {
-        console.log('Printing...');
-
-        const printOptions = {
-          silent: false,
-          printBackground: true,
-          color: true,
-          margins: {
-            marginType: 'none' as 'none', // 'none', 'printableArea', or custom
-          },
-          pageSize: 'A4' as 'A4',
-          printSelectionOnly: false,
-          landscape: false,
+        if (canceled) {
+          event.reply('generate-pdf-reply', {
+            success: false,
+            message: 'Canceled by user',
+          });
+          return;
         };
 
-        win.webContents.print(printOptions, () => {
-          win.close();
+        if (obj?.saveAs == 'pdf') {
+
+          defaultExt = '.pdf';
+          defaultTitle = "Save PDF";
+
+          if (!canceled || filePath) {
+            fs.writeFileSync(filePath, data);
+          }
+
           event.reply('generate-pdf-reply', {
             success: true,
-            message: 'Printed successfully',
+            message: 'PDF saved successfully!',
           });
-        });
+
+
+        } else if (obj?.saveAs == 'png') {
+
+          defaultExt = '.png';
+          defaultTitle = "Save PNG";
+
+          let opts = {
+            format: 'png',
+            scale: 3_508,
+            out_dir: path.dirname(filePath),
+            out_prefix: path.basename(filePath, path.extname(filePath)),
+            page: null,
+            args: {},
+          };
+
+          pdf.convert(tempFile, opts)
+            .then(() => {
+              event.reply('generate-pdf-reply', {
+                success: true,
+                message: 'File saved successfully!',
+              });
+            })
+            .catch((error: any) => {
+              event.reply('generate-pdf-reply', {
+                success: false,
+                message: 'Failed to save file!',
+              });
+              console.error(error);
+            })
+
+        }
+
+        fs.unlinkSync(tempFile);
+
       }
+
+
     } catch (error) {
       console.error(error);
     }

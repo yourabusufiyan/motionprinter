@@ -883,11 +883,12 @@ ipcMain.on(
     obj: {
       htmlContent: string;
       head: string;
-      isPrint?: boolean;
-      printPDF?: boolean;
+      printSheet?: boolean;
       filename?: string;
+      saveAs?: 'pdf' | 'png' | 'jpg';
     },
   ) => {
+
     const win = new BrowserWindow({
       show: isDev,
       webPreferences: {
@@ -914,17 +915,17 @@ ipcMain.on(
       }
 
       const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        ${cssFiles.map((el, i) => `<style type="text/css" id="inserted-${i}">${el}</style>`).join('\n')}
-        ${obj.head}
-      </head>
-      <body>
-        ${obj.htmlContent}
-      </body>
-    </html>
-  `;
+        <!DOCTYPE html>
+        <html>
+          <head>
+            ${cssFiles.map((el, i) => `<style type="text/css" id="inserted-${i}">${el}</style>`).join('\n')}
+            ${obj.head}
+          </head>
+          <body>
+            ${obj.htmlContent}
+          </body>
+        </html>
+      `;
 
       await win.loadURL(
         `data:text/html;charset=UTF-8,${encodeURIComponent(htmlContent)}`,
@@ -932,8 +933,8 @@ ipcMain.on(
 
       await sleep(500);
 
-      if (obj?.printPDF) {
-        console.log('Printing to PDF...');
+      if (!!obj?.saveAs) {
+        console.log('Saving as ', obj.saveAs);
         const pdfOptions = {
           color: true,
           margins: {
@@ -949,17 +950,40 @@ ipcMain.on(
           landscape: false,
         };
 
-        const data = await win.webContents.printToPDF(pdfOptions);
+        let defaultExt;
+        let defaultTitle;
+        let data: Buffer = '' as unknown as Buffer;
+
+        if (obj?.saveAs == 'pdf') {
+
+          data = await win.webContents.printToPDF(pdfOptions);
+          defaultExt = '.pdf';
+          defaultTitle = "Save PDF";
+
+        } else if (obj?.saveAs == 'png' || obj?.saveAs == 'jpg') {
+
+          // 1. Capture the window's content
+          const image = await win.webContents.capturePage();
+
+          // 2. Convert to desired format
+          if (obj?.saveAs === 'jpg') {
+            data = image.toJPEG(100);
+            defaultExt = '.jpg';
+          } else {
+            data = image.toPNG(); // Lossless format with transparency
+            defaultExt = '.png';
+          }
+
+        }
 
         const { canceled, filePath } = await dialog.showSaveDialog(
           win as BrowserWindow,
           {
-            title: 'Save PDF',
+            title: defaultTitle,
             defaultPath: path.join(
               os.homedir(),
               'Downloads',
-              obj?.filename ||
-              `mp-photosheet-${crypto.randomUUID().substring(0, 8)}.pdf`,
+              `${obj?.filename}${defaultExt}` || `mp-photosheet-${crypto.randomUUID().substring(0, 8)}${defaultExt}`,
             ),
           },
         );
@@ -975,7 +999,7 @@ ipcMain.on(
         });
       }
 
-      if (obj?.isPrint) {
+      if (obj?.printSheet) {
         console.log('Printing...');
 
         const printOptions = {

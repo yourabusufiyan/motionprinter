@@ -305,7 +305,7 @@ const updateDimensions = () => {
   }
 };
 
-const doAction = async (printPDF: boolean = false, saveAs: string = 'pdf') => {
+const doAction = async (printSheet: boolean = false, saveAs: string = 'pdf') => {
   if (!pdfContent.value) {
     console.error('Element not found', pdfContent.value);
     return;
@@ -331,19 +331,18 @@ const doAction = async (printPDF: boolean = false, saveAs: string = 'pdf') => {
     </style>
   `;
 
-  console.log('printPDF', printPDF);
+  console.log('printSheet', printSheet);
   console.log('saveAs', saveAs);
 
-  isPdfDownloading.value = printPDF
-  isPrinting.value = !printPDF
+  isPdfDownloading.value = !!saveAs
+  isPrinting.value = printSheet
 
   let obj = {
     head,
     saveAs,
+    printSheet,
     htmlContent: pdfContent.value.innerHTML,
-    printPDF: printPDF,
-    isPrint: !printPDF,
-    filename: `mp-photosheet-${currentPage.value.id}.pdf`,
+    filename: `mp-photosheet-${currentPage.value.id}`,
   }
 
   ipcRenderer.send('generate-pdf', obj);
@@ -507,7 +506,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
           Button(@click="removeEmptyCell()" :disabled="!currentPage.photos?.length") Remove Empty Cell
 
     .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
-      Button(@click="doAction(false)" :disabled="isInAction || !currentPage?.photos?.length" ) 
+      Button(@click="doAction(true)" :disabled="isInAction || !currentPage?.photos?.length" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
         | <Printer/> Print
       Button.hidden(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")

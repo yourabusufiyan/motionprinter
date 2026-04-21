@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -410,6 +411,9 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
       @change="handleFileSelect"
     )
     pre.hidden {{ currentPage}}
+    .photo-option.sticky.bottom-0.bg-red-500.px-6.py-1
+      Checkbox#fit-to-frame
+      Label(for="fit-to-frame") Fit Picture to Frame
   .scroll-container.right-container.w-52.border-l.flex.flex-col.space-y-4
     .info.px-6.pt-2
       p.text-sm Photo Size : 
@@ -506,10 +510,10 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
           Button(@click="removeEmptyCell()" :disabled="!currentPage.photos?.length") Remove Empty Cell
 
     .action-container.flex.flex-col.px-6.pb-4.space-y-2(:class="{'cursor-not-allowed': isInAction}")
-      Button(@click="doAction(true)" :disabled="isInAction || !currentPage?.photos?.length" ) 
+      Button(@click="doAction(true, '')" :disabled="isInAction || !currentPage?.photos?.length" ) 
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPrinting")
         | <Printer/> Print
-      Button.hidden(@click="doAction(true)" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")
+      Button.hidden(@click="doAction(true, '')" variant="outline" :disabled="isInAction || !currentPage?.photos?.length")
         Loader2.w-4.h-4.mr-2.animate-spin(v-if="isPdfDownloading")
         | Download PDF
       DropdownMenu
@@ -519,9 +523,10 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
               Loader2.w-4.h-4.animate-spin 
             span(v-else) <Download class="inline align-top mr-1"/> Save As 
         DropdownMenuContent.w-40(align="end")
-          DropdownMenuItem(@click="doAction(false, 'pdf')") <FileText class="mr-2 h-4 w-4" /> PDF
-          DropdownMenuItem(@click="doAction(false, 'jpg')") <ImageIcon class="mr-2 h-4 w-4" /> JPG
+          DropdownMenuItem.hidden(@click="doAction(false, 'tiff')") <ImageIcon class="mr-2 h-4 w-4" /> TIFF
           DropdownMenuItem(@click="doAction(false, 'png')") <ImageIcon class="mr-2 h-4 w-4" /> PNG
+          DropdownMenuItem(@click="doAction(false, 'jpg')") <ImageIcon class="mr-2 h-4 w-4" /> JPG
+          DropdownMenuItem(@click="doAction(false, 'pdf')") <FileText class="mr-2 h-4 w-4" /> PDF
 </template>
 
 <style lang="stylus" scoped>

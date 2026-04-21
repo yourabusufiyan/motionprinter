@@ -936,7 +936,8 @@ ipcMain.on(
 
 
       let data: Buffer = '' as unknown as Buffer;
-      const tempFile = path.join(app.getPath('temp'), `mp-temp-${id}.pdf`);
+      const tempFolder = path.join(os.homedir(), app.getName(), './temp/')
+      const tempFile = path.join(tempFolder, `mp-temp-${id}.pdf`);
 
       const pdfOptions = {
         color: true,
@@ -957,6 +958,28 @@ ipcMain.on(
 
       // Save to temp
       fs.writeFileSync(tempFile, data);
+
+      if(obj?.printSheet) {
+        print(tempFile, { silent: false, printDialog: true })
+        .then(() => {
+          console.log(`Printed file: ${tempFile}`);
+          win.close();
+          event.reply('generate-pdf-reply', {
+            success: true,
+            message: 'Photosheet is send to print.',
+          });
+          return; 
+        })
+        .catch((err) => {
+          console.error(`Error printing file: ${tempFile}`, err);
+          win.close(); 
+          event.reply('generate-pdf-reply', {
+            success: false,
+            message: 'something went wrong during sending to print.',
+          });
+          return; 
+        });
+      }
 
       if (!!obj?.saveAs) {
 
@@ -1000,15 +1023,31 @@ ipcMain.on(
             message: 'PDF saved successfully!',
           });
 
+          fs.unlinkSync(tempFile);
 
-        } else if (obj?.saveAs == 'png') {
+        } else if (['jpg', 'png', 'tiff'].includes(obj?.saveAs?.toLowerCase())) {
 
-          defaultExt = '.png';
-          defaultTitle = "Save PNG";
+          switch (obj?.saveAs) {
+            case 'png':
+              defaultExt = '.png';
+              defaultTitle = "Save PNG";
+              break;
+            case 'jpg':
+              defaultExt = '.jpg';
+              defaultTitle = "Save JPG";
+              break;
+            case 'tiff':
+              defaultExt = '.tiff';
+              defaultTitle = "Save TIFF";
+              break;
+          
+            default:
+              break;
+          }          
 
           let opts = {
-            format: 'png',
-            scale: 3_508,
+            format: obj?.saveAs,
+            scale: 1024,
             out_dir: path.dirname(filePath),
             out_prefix: path.basename(filePath, path.extname(filePath)),
             page: null,
@@ -1029,10 +1068,12 @@ ipcMain.on(
               });
               console.error(error);
             })
+            .finally(() => {
+              fs.unlinkSync(tempFile);
+            });
 
         }
 
-        fs.unlinkSync(tempFile);
 
       }
 

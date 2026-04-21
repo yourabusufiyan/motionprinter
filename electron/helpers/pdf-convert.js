@@ -24,7 +24,7 @@ module.exports = function (file, opts) {
     opts.out_dir = opts.out_dir || defaultOptions.out_dir;
     opts.out_prefix = opts.out_prefix || path.dirname(file);
     opts.out_prefix =
-    opts.out_prefix || path.basename(file, path.extname(file));
+      opts.out_prefix || path.basename(file, path.extname(file));
     opts.page = opts.page || defaultOptions.page;
 
     let args = [];

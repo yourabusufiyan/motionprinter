@@ -1,108 +1,139 @@
 <script setup lang="ts">
-import { Button as uiButton } from '@/components/ui/button'
+import { Button as uiButton } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue, } from '@/components/ui/select'
-import { NumberField, NumberFieldContent, NumberFieldDecrement, NumberFieldIncrement, NumberFieldInput, } from '@/components/ui/number-field'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog'
-import { toast } from 'vue-sonner'
-
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  NumberField,
+  NumberFieldContent,
+  NumberFieldDecrement,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { toast } from 'vue-sonner';
 
 import { useLordStore } from '@/stores/LordStore';
-import { ref, computed, onMounted, watch } from 'vue'
-import { find, size, isNumber } from 'lodash'
-import { ChevronDownIcon, MinusIcon, PlusIcon } from '@radix-icons/vue'
-import axios from 'axios'
-import { VuePDF, usePDF } from '@tato30/vue-pdf'
+import { ref, computed, onMounted, watch } from 'vue';
+import { find, size, isNumber } from 'lodash';
+import { ChevronDownIcon, MinusIcon, PlusIcon } from '@radix-icons/vue';
+import axios from 'axios';
+import { VuePDF, usePDF } from '@tato30/vue-pdf';
 
-import type { connectedPC } from '@/declarations/LordStore'
+import type { connectedPC } from '@/declarations/LordStore';
 
-import '@tato30/vue-pdf/style.css'
+import '@tato30/vue-pdf/style.css';
 
-const lordStore = useLordStore()
+const lordStore = useLordStore();
 
-const computersList = computed(() => lordStore.db.ConnectedPCs)
-const selectedComputer = ref('')
-const selectedComputerData = computed(() => find(lordStore.db.ConnectedPCs, ['ip', selectedComputer.value]))
+const computersList = computed(() => lordStore.db.ConnectedPCs);
+const selectedComputer = ref('');
+const selectedComputerData = computed(() =>
+  find(lordStore.db.ConnectedPCs, ['ip', selectedComputer.value]),
+);
 
-const printerList = computed(() => selectedComputerData.value?.printers || [])
-const selectedPrinter = ref('')
-const selectedPrinterData = computed(() => find(selectedComputerData.value?.printers, ['name', selectedPrinter.value]))
+const printerList = computed(() => selectedComputerData.value?.printers || []);
+const selectedPrinter = ref('');
+const selectedPrinterData = computed(() =>
+  find(selectedComputerData.value?.printers, ['name', selectedPrinter.value]),
+);
 
-
-const copies = ref(1)
-const pages = ref('all')
-const customPages = ref('')
-const colorMode = ref('black_and_white')
-const paperSizes = ref('A4')
+const copies = ref(1);
+const pages = ref('all');
+const customPages = ref('');
+const colorMode = ref('black_and_white');
+const paperSizes = ref('A4');
 const paperSizesData = computed(() => {
   let o: { [property: string]: string } = {
     ...{
-      "A2": "A2",
-      "A6": "A6",
-      "A3": "A3",
-      "A4": "A4",
-      "A5": "A5",
-      "letter": "Letter",
-      "legal": "Legal",
-      "tabloid": "Tabloid",
-      "statement": "Statement",
+      A2: 'A2',
+      A6: 'A6',
+      A3: 'A3',
+      A4: 'A4',
+      A5: 'A5',
+      letter: 'Letter',
+      legal: 'Legal',
+      tabloid: 'Tabloid',
+      statement: 'Statement',
     },
-  }
-  return Object.keys(o).sort().reduce((r, k) => (r[k] = o[k], r), {} as { [property: string]: string })
-})
-const scale = ref('fit')
-const customScale = ref(100)
-const paperPerSheet = ref('1')
-const margin = ref('default')
-const towSidedPrinting = ref('simplex')
+  };
+  return Object.keys(o)
+    .sort()
+    .reduce((r, k) => ((r[k] = o[k]), r), {} as { [property: string]: string });
+});
+const scale = ref('fit');
+const customScale = ref(100);
+const paperPerSheet = ref('1');
+const margin = ref('default');
+const towSidedPrinting = ref('simplex');
 
-const isDialogOpen = ref(false)
-const fileInput = ref<any>(null) // for resetting the file input only
-const file = ref() // for storing the file data
-const isFileUploading = ref(false)
-const isFileUploaded = ref(false)
-const uploadFiled = ref({}) // storing the uploaded file responded data
-const pdfBuffer = ref('')
-const { pdf, pages: pdfPages, info } = usePDF(pdfBuffer)
-const isRangeValid = ref(true)
-const rangeErrorMessage = ref('Number should be under the range.')
-
+const isDialogOpen = ref(false);
+const fileInput = ref<any>(null); // for resetting the file input only
+const file = ref(); // for storing the file data
+const isFileUploading = ref(false);
+const isFileUploaded = ref(false);
+const uploadFiled = ref({}); // storing the uploaded file responded data
+const pdfBuffer = ref('');
+const { pdf, pages: pdfPages, info } = usePDF(pdfBuffer);
+const isRangeValid = ref(true);
+const rangeErrorMessage = ref('Number should be under the range.');
 
 // I do not have know about Event type. that why i assigned it to :any
 function handleFileUpload(event: any) {
+  console.log(event);
 
-  console.log(event)
-
-  isDialogOpen.value = true
+  isDialogOpen.value = true;
 
   if (event?.target?.files && event.target.files[0]) {
+    console.log(event?.target?.files[0]?.type);
 
-    console.log(event?.target?.files[0]?.type)
-
-    file.value = event.target.files[0]
+    file.value = event.target.files[0];
     const reader = new FileReader();
 
     reader.onload = function (e) {
-      console.log('e.target.result', typeof e?.target?.result)
+      console.log('e.target.result', typeof e?.target?.result);
       if (e?.target?.result) {
         pdfBuffer.value = e?.target?.result as string;
       }
     };
 
     reader.readAsDataURL(event.target.files[0]);
-
   }
-
 }
 
 function commandToPrint(filename: string = '') {
-
   const options = {
     printer: selectedPrinter.value,
-    pages: pages.value == 'all' ? 'all' : pages.value == 'custom' ? customScale.value : '',
+    pages:
+      pages.value == 'all'
+        ? 'all'
+        : pages.value == 'custom'
+          ? customScale.value
+          : '',
     // @ts-expect-error : here we want pages value to be even or odd only
     subset: pages.value == 'odd' && pages.value == 'even' ? pages.value : '',
     monochrome: colorMode.value != 'color',
@@ -111,127 +142,153 @@ function commandToPrint(filename: string = '') {
     silent: true,
     printDialog: false,
     side: towSidedPrinting.value,
-    copies: +copies.value
-  }
+    copies: +copies.value,
+  };
 
-  axios.post(`http://${selectedComputerData.value?.ip}:9457/api/v1/print/`, { filename, options }, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  }).then((response) => {
-    if (response.data?.print == 'successful') {
-      console.log('Print successful')
-      if (file.value?.name) {
-        toast.success('Printed' + (selectedComputerData.value?.computerName ? ' from ' + selectedComputerData.value.computerName : '...'), {
-          description: file.value?.name
-        })
+  axios
+    .post(
+      `http://${selectedComputerData.value?.ip}:9457/api/v1/print/`,
+      { filename, options },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+      },
+    )
+    .then((response) => {
+      if (response.data?.print == 'successful') {
+        console.log('Print successful');
+        if (file.value?.name) {
+          toast.success(
+            'Printed' +
+              (selectedComputerData.value?.computerName
+                ? ' from ' + selectedComputerData.value.computerName
+                : '...'),
+            {
+              description: file.value?.name,
+            },
+          );
+        }
+      } else {
+        toast.error('Something went wrong...', {
+          description: file.value?.name,
+        });
       }
-    } else {
-      toast.error('Something went wrong...', {
-        description: file.value?.name
-      })
-    }
-    isDialogOpen.value = false
-    if (fileInput.value?.value) {
-      fileInput.value.value = ''
-    } else {
-      fileInput.value.value = null
-    }
-    file.value = null
-    isFileUploading.value = false
-    isFileUploaded.value = false
-    uploadFiled.value = {}
-    pdfBuffer.value = ''
-    console.log('commandToPrint : ', response.data)
-  }).catch((err: any) => {
-    console.log('commandToPrint : ', err)
-  })
+      isDialogOpen.value = false;
+      if (fileInput.value?.value) {
+        fileInput.value.value = '';
+      } else {
+        fileInput.value.value = null;
+      }
+      file.value = null;
+      isFileUploading.value = false;
+      isFileUploaded.value = false;
+      uploadFiled.value = {};
+      pdfBuffer.value = '';
+      console.log('commandToPrint : ', response.data);
+    })
+    .catch((err: any) => {
+      console.log('commandToPrint : ', err);
+    });
 }
 
 function handlePrint() {
-
   if (size(file)) {
+    console.log('handlePrint - file : ', selectedComputerData);
 
-    console.log('handlePrint - file : ', selectedComputerData)
+    isDialogOpen.value = false;
 
-    isDialogOpen.value = false
+    toast.info(
+      'Sending ' +
+        (selectedComputerData.value?.computerName
+          ? ' to ' + selectedComputerData.value.computerName
+          : '...'),
+      {
+        description: file.value?.name ? file.value?.name : '',
+      },
+    );
 
-    toast.info('Sending ' + (selectedComputerData.value?.computerName ? ' to ' + selectedComputerData.value.computerName : '...'), {
-      description: file.value?.name ? file.value?.name : ''
-    })
+    isFileUploading.value = true;
 
-    isFileUploading.value = true
-
-    console.log('handlePrint', file.value)
+    console.log('handlePrint', file.value);
 
     var formData = new FormData();
-    console.log('file.value', file.value)
-    formData.append("sampleFile", file.value);
+    console.log('file.value', file.value);
+    formData.append('sampleFile', file.value);
     if (lordStore.db?.computerName) {
-      formData.append("addedBy", lordStore.db.computerName);
-      formData.append("addedTo", selectedComputerData.value?.computerName ?? '');
+      formData.append('addedBy', lordStore.db.computerName);
+      formData.append(
+        'addedTo',
+        selectedComputerData.value?.computerName ?? '',
+      );
     }
     if (selectedComputerData.value?.ip != undefined) {
-
       if (lordStore.db.ip != selectedComputerData.value.ip) {
-        axios.post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        }).catch(e => e = !e)
+        axios
+          .post(`http://${lordStore.db.ip}:9457/api/v1/upload/`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          })
+          .catch((e) => (e = !e));
       }
 
-      axios.post(`http://${selectedComputerData.value.ip}:9457/api/v1/upload/`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }).then((response) => {
-        isFileUploaded.value = true;
-        uploadFiled.value = response.data
-        console.log('uploaded : ', response.data)
-        commandToPrint(response.data.filename)
-      }).catch(() => {
-        toast.error('Something went wrong...')
-        isFileUploaded.value = false;
-        console.log('Not uploaded')
-      })
+      axios
+        .post(
+          `http://${selectedComputerData.value.ip}:9457/api/v1/upload/`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          },
+        )
+        .then((response) => {
+          isFileUploaded.value = true;
+          uploadFiled.value = response.data;
+          console.log('uploaded : ', response.data);
+          commandToPrint(response.data.filename);
+        })
+        .catch(() => {
+          toast.error('Something went wrong...');
+          isFileUploaded.value = false;
+          console.log('Not uploaded');
+        });
     }
   } else {
-    toast.warning('No file selected.')
-    console.log('No file selected', file.value, size(file))
+    toast.warning('No file selected.');
+    console.log('No file selected', file.value, size(file));
   }
-
 }
 
 function handleCancel() {
-  isDialogOpen.value = false
+  isDialogOpen.value = false;
   if (fileInput.value?.value) {
-    fileInput.value.value = ''
+    fileInput.value.value = '';
   } else {
-    fileInput.value = null
+    fileInput.value = null;
   }
-  file.value = null
-  isFileUploading.value = false
-  isFileUploaded.value = false
-  uploadFiled.value = {}
-  pdfBuffer.value = ''
+  file.value = null;
+  isFileUploading.value = false;
+  isFileUploaded.value = false;
+  uploadFiled.value = {};
+  pdfBuffer.value = '';
 }
 
 function isRangeValidation() {
-
   let o = customPages.value || '';
-  let max = isNumber(pdfPages.value) ? pdfPages.value : 100
-  console.log(o.split(','))
+  let max = isNumber(pdfPages.value) ? pdfPages.value : 100;
+  console.log(o.split(','));
 
-  isRangeValid.value = typeof o == 'string'
-    && o.split(',').every(el => {
-
-      el = el.trim()
-      console.log('Every : ', el)
+  isRangeValid.value =
+    typeof o == 'string' &&
+    o.split(',').every((el) => {
+      el = el.trim();
+      console.log('Every : ', el);
 
       if (el.includes('-')) {
-        let range = el.split('-')
+        let range = el.split('-');
         // console.log('range : ',  el, +el[0] < +el[1], el.every(el => +el > 0 && +el <= max ) )
 
         // if (+range[0] > +range[1]) {
@@ -240,29 +297,30 @@ function isRangeValidation() {
         //   rangeErrorMessage.value = 'Range must be a number between 1 and ' + max + '.'
         // }
 
-        return +range[0] < +range[1] && range.every(el => +el > 0 && +el <= max)
+        return (
+          +range[0] < +range[1] && range.every((el) => +el > 0 && +el <= max)
+        );
       }
 
       if (isNumber(+el)) {
         // console.log('Number : ', +el > 0 && +el <= max)
-        return +el > 0 && +el <= max
+        return +el > 0 && +el <= max;
       }
 
       return false;
-
-    })
+    });
 }
 
 onMounted(async () => {
-
-
   if (lordStore.db.ConnectedPCs?.length == 1) {
-    selectedComputer.value = lordStore.db.ConnectedPCs[0]?.ip ? lordStore.db.ConnectedPCs[0]?.ip : ''
-    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.name ? lordStore.db.ConnectedPCs[0]?.printersDefault?.name : ''
+    selectedComputer.value = lordStore.db.ConnectedPCs[0]?.ip
+      ? lordStore.db.ConnectedPCs[0]?.ip
+      : '';
+    selectedPrinter.value = lordStore.db.ConnectedPCs[0]?.printersDefault?.name
+      ? lordStore.db.ConnectedPCs[0]?.printersDefault?.name
+      : '';
   }
-
-})
-
+});
 </script>
 
 <template lang="pug">
@@ -273,6 +331,7 @@ onMounted(async () => {
       role="form",
       method="post",
       enctype="multipart/form-data"
+      class="dark:bg-gray-800 dark:text-white"
     )
       .w-full.text-center
         p.block.py-16.w-full.cursor-not-allowed(v-if="isFileUploading") Processing to print the file....
@@ -298,7 +357,7 @@ Dialog(v-model:open="isDialogOpen")
     )
         .flex.justify-between.max-w-full.max-w-full.overflow-hidden
 
-          .preview-content-container.overflow-auto.bg-neutral-300.w-full
+          .preview-content-container.overflow-auto.bg-neutral-300.w-full(class="dark:bg-gray-800")
             .preview-content.flex.justify-center.my-4.shadow-sm.flex-col.items-center
               pre.hidden {{ pages == 'custom' ? 'df' : true }}
               pre.hidden selectedComputer : {{ selectedComputer }}
@@ -312,16 +371,16 @@ Dialog(v-model:open="isDialogOpen")
           .options-content-container.min-w-52.mt-0.border-l-2.flex.justify-between.flex-col(
             class="md:min-w-60 lg:min-w-64 xl:min-w-64"
           )
-            .options-title-container.p-2.pb-0.flex.justify-between.w-full
+            .options-title-container.p-2.pb-0.flex.justify-between.w-full(class="dark:text-white")
               h1.title.text-xl Print
               p.text-right {{ pdfPages }} page(s)
             .border-t.mx-3.my-1.mt-2.border-gray-400
 
             .max-h-screen.overflow-y-auto.flex-1
               .computer-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Computers
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Computers
                 Select(v-model="selectedComputer")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Computer')
                   SelectContent
                       SelectItem(
@@ -332,9 +391,9 @@ Dialog(v-model:open="isDialogOpen")
                       ) {{ computer.computerName }} {{ computer.isConnected ? '' : ' : Offline' }}
 
               .printer-select-container.block.p-2( v-if="selectedComputer" )
-                p.text-sm.text-black.mb-2 Printers
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Printers
                 Select(v-model="selectedPrinter")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Printer')
                   SelectContent
                       SelectItem(
@@ -344,12 +403,13 @@ Dialog(v-model:open="isDialogOpen")
                       ) {{ printer.name }} {{ printer.name == selectedComputer?.defaultPrinter?.name ? ' : Default' : ''}}
 
               .copies-select-container.block.p-2
-                Label.text-sm.text-black.mb-2.block.font-normal Copies
+                Label.text-sm.text-black.mb-2.block.font-normal(class="dark:text-slate-300") Copies
                 NumberField.w-20(
                   v-model="copies"
                   :min="1"
                   :max="100"
                   :step="1"
+                  class="dark:text-slate-200 dark:bg-slate-900 "
                 )
                   NumberFieldContent
                     NumberFieldDecrement(class="p-3")
@@ -359,9 +419,9 @@ Dialog(v-model:open="isDialogOpen")
                       PlusIcon.h-3.w-3
 
               .pages-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Pages
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Pages
                 Select(v-model="pages")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a page(s)')
                   SelectContent
                     SelectItem( value="all" ) All
@@ -381,9 +441,9 @@ Dialog(v-model:open="isDialogOpen")
                 ) {{ rangeErrorMessage }}
 
               .colorMode-select-container.block.p-2
-                p.text-sm.text-black.mb-2 Color Mode
+                p.text-sm.text-black.mb-2(class="dark:text-slate-300") Color Mode
                 Select(v-model="colorMode" default-value="black_and_white")
-                  SelectTrigger(class='w-[180px] bg-gray-100')
+                  SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                     SelectValue(placeholder='Select a Printer')
                   SelectContent
                       SelectItem( value="color" ) Color
@@ -391,7 +451,7 @@ Dialog(v-model:open="isDialogOpen")
 
               .border-t.mt-2.border-gray-400( class="w-[90%] mx-auto" )
 
-              Accordion(type="single" collapsible)
+              Accordion(type="single" collapsible class="dark:text-slate-200")
                 AccordionItem( value="item-1"  class="border-none" )
                   AccordionTrigger(
                     class="max-w-[90%] mx-auto"
@@ -399,15 +459,15 @@ Dialog(v-model:open="isDialogOpen")
                   AccordionContent
 
                     .paperSizes-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Paper Size
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-300") Paper Size
                       Select(v-model="paperSizes" default-value="a4")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Select a Printer')
                         SelectContent
                             SelectItem( v-for="(value, key) in paperSizesData" :key="key" :value="key" ) {{ value }}
 
                     .scale-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Scale
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Scale
                       RadioGroup( v-model="scale" default-value="fit")
                         .flex.items-center.space-x-2
                           RadioGroupItem#fit(value="fit")
@@ -436,9 +496,9 @@ Dialog(v-model:open="isDialogOpen")
                           label.cursor-pointer(for="noscale") No scale
 
                     .pagePerSheet-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Paper per sheet
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Paper per sheet
                       Select(v-model="paperPerSheet", defaultValue="1")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Paper per sheet')
                         SelectContent
                             SelectItem( value="1" ) 1
@@ -449,9 +509,9 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="16" ) 16
 
                     .margin-select-container.block.p-2.hidden
-                      p.text-sm.text-black.mb-2 Margin
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Margin
                       Select(v-model="margin", defaultValue="default")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Select a Printer')
                         SelectContent
                             SelectItem( value="default" ) Default
@@ -460,9 +520,9 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="custom" ) Custom (mm)
 
                     .towSidedPrinting-select-container.block.p-2
-                      p.text-sm.text-black.mb-2 Two-sided printing
+                      p.text-sm.text-black.mb-2(class="dark:text-slate-200") Two-sided printing
                       Select(v-model="towSidedPrinting", defaultValue="simplex")
-                        SelectTrigger(class='w-[180px] bg-gray-100')
+                        SelectTrigger(class='w-[180px] bg-gray-100 dark:bg-slate-900 dark:text-slate-200')
                           SelectValue(placeholder='Paper per sheet')
                         SelectContent
                             SelectItem( value="simplex" ) Off
@@ -470,7 +530,7 @@ Dialog(v-model:open="isDialogOpen")
                             SelectItem( value="duplexshort" ) Flip on short edge
 
             .bottom-0.bg-white.width-full.max-w-full
-              .button-container.flex.justify-end.gap-3.p-3.bg-white.border-t.border-1
+              .button-container.flex.justify-evenly.gap-3.p-3.bg-white.border-t.border-1( class="dark:bg-gray-900 dark:border-gray-700" )
                 uiButton( class="md:px-8" @click="handlePrint()" :disabled="pages == 'custom' ? !isRangeValid : !true" ) Print
                 uiButton( variant="secondary" class="md:px-8" @click="handleCancel()" ) Cancel
 

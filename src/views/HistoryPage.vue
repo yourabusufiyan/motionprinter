@@ -1,12 +1,12 @@
 <script lang="ts" setup>
-import moment from 'moment'
-import { chunk, fill, sortBy, concat, cloneDeep } from 'lodash'
-import { ref, computed, reactive } from 'vue'
+import moment from 'moment';
+import { chunk, fill, sortBy, concat, cloneDeep } from 'lodash';
+import { ref, computed, reactive } from 'vue';
 
 import { useLordStore } from '../stores/LordStore';
-import { humanFileSize } from './../utils/short-functions'
+import { humanFileSize } from './../utils/short-functions';
 
-import type { $toPrintsCommandsFile, $lordData } from './../declarations'
+import type { $toPrintsCommandsFile, $lordData } from './../declarations';
 
 import { ipcRenderer } from 'electron';
 
@@ -18,8 +18,8 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from './../components/ui/select'
-import { Badge } from '@/components/ui/badge'
+} from './../components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +27,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,40 +38,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { toast } from 'vue-sonner'
+} from '@/components/ui/alert-dialog';
+import { toast } from 'vue-sonner';
 
 const lordStore = useLordStore();
-const numberOfColumnsToDisplay = ref('10')
-const pagination = computed<$toPrintsCommandsFile[][]>(() => chunk(sortBy(lordStore.lowdb.data?.toPrintsCommands, ['addedTime']).toReversed(), +numberOfColumnsToDisplay.value))
-const currentPage = ref(0)
+const numberOfColumnsToDisplay = ref('10');
+const pagination = computed<$toPrintsCommandsFile[][]>(() =>
+  chunk(
+    sortBy(lordStore.lowdb.data?.toPrintsCommands, ['addedTime']).toReversed(),
+    +numberOfColumnsToDisplay.value,
+  ),
+);
+const currentPage = ref(0);
 const paginationNumbers = computed(() => {
-
   if (pagination.value.length <= 7)
     return fill(Array(pagination.value.length), 'a').map((el, i) => i);
 
   if (currentPage.value <= 4) {
-    return fill(Array(7), 'a').map((el, i) => i)
+    return fill(Array(7), 'a').map((el, i) => i);
   } else if (currentPage.value >= pagination.value.length - 4) {
-    return fill(Array(pagination.value.length), 'a').splice(0, 7).map((el, i) => pagination.value.length - 1 - i).sort()
+    return fill(Array(pagination.value.length), 'a')
+      .splice(0, 7)
+      .map((el, i) => pagination.value.length - 1 - i)
+      .sort();
   } else {
-    return [-3, -2, -1, 0, 1, 2, 3].map(el => currentPage.value + Number(el));
+    return [-3, -2, -1, 0, 1, 2, 3].map((el) => currentPage.value + Number(el));
   }
+});
 
-})
-
-let selectedItems = ref<$toPrintsCommandsFile[]>([])
-const isAllSelected = computed<boolean>(() => selectedItems.value.length == +numberOfColumnsToDisplay.value)
-
+let selectedItems = ref<$toPrintsCommandsFile[]>([]);
+const isAllSelected = computed<boolean>(
+  () => selectedItems.value.length == +numberOfColumnsToDisplay.value,
+);
 
 function selectAllItems() {
-  console.log("selectAllItems")
+  console.log('selectAllItems');
   if (isAllSelected.value) {
-    console.log("isAllSelected is true", isAllSelected.value)
-    selectedItems.value = []
+    console.log('isAllSelected is true', isAllSelected.value);
+    selectedItems.value = [];
   } else {
-    console.log("isAllSelected", isAllSelected.value, pagination.value[currentPage.value])
-    selectedItems.value = pagination.value[currentPage.value]
+    console.log(
+      'isAllSelected',
+      isAllSelected.value,
+      pagination.value[currentPage.value],
+    );
+    selectedItems.value = pagination.value[currentPage.value];
   }
 }
 
@@ -82,52 +93,47 @@ function displayFileName(fileNames: string) {
   var lengthFname = fName.length;
   //if file name without extension contains more than 15 characters
   if (lengthFname > 40) {
-    return fName.substr(0, 26) + " ..... " + fName.substr(-4) + "." + fExtension;
+    return (
+      fName.substr(0, 26) + ' ..... ' + fName.substr(-4) + '.' + fExtension
+    );
   }
-  return fileNames
+  return fileNames;
 }
 
-
 function deleteFile(file: $toPrintsCommandsFile): boolean {
-
   let isDeleted = false;
 
   if (!lordStore.lowdb.data?.toPrintsCommands?.length) return isDeleted;
 
-  console.log("deleteFile", file)
+  console.log('deleteFile', file);
 
   let beforeCount = lordStore.lowdb.data.toPrintsCommands.length;
 
   let removeFiled = lordStore.lowdb.data.toPrintsCommands.filter((el: any) => {
-
     if (el.filename != file.filename) return true;
 
     isDeleted = true;
 
     return false;
+  });
+  console.log('isDeleted', isDeleted);
 
-  })
-  console.log("isDeleted", isDeleted)
-
-  lordStore.lowdb.data.trashes = concat(
-    lordStore.lowdb.data.trashes,
-    {
-      ...file,
-      ...{
-        trashedBy: 'auto',
-        isDeleted: false,
-        deletedBy: null,
-        deletedTime: null,
-        trashedTime: Date.now()
-      }
-    }
-  )
+  lordStore.lowdb.data.trashes = concat(lordStore.lowdb.data.trashes, {
+    ...file,
+    ...{
+      trashedBy: 'auto',
+      isDeleted: false,
+      deletedBy: null,
+      deletedTime: null,
+      trashedTime: Date.now(),
+    },
+  });
 
   lordStore.lowdb.data.toPrintsCommands = removeFiled;
 
   let afterCount = lordStore.lowdb.data.toPrintsCommands.length;
 
-  console.log("before count", beforeCount, "after count", afterCount)
+  console.log('before count', beforeCount, 'after count', afterCount);
 
   if (isDeleted) {
     lordStore.saveLowDB();
@@ -135,52 +141,47 @@ function deleteFile(file: $toPrintsCommandsFile): boolean {
   }
 
   return isDeleted;
-
 }
 
 function onDelete(file: $toPrintsCommandsFile): void {
-
   let isDeleted = deleteFile(file);
   if (isDeleted) {
     toast.success('File moved to trash.', {
       description: file.originalName,
-    })
+    });
   } else {
     toast.error('Something went wrong.', {
       description: file.originalName,
-    })
+    });
   }
-  console.log("onDelete", file)
+  console.log('onDelete', file);
 }
 
 function onDownload(file: $toPrintsCommandsFile): void {
   try {
-    ipcRenderer.send('download-file', cloneDeep(file))
+    ipcRenderer.send('download-file', cloneDeep(file));
   } catch (error) {
-    error = !error
+    error = !error;
   }
 }
-
-
 
 ipcRenderer.on('download-success', (event, file) => {
   toast.success('File downloaded successfully.', {
     description: file.originalName,
-  })
+  });
 });
 
 ipcRenderer.on('download-error', (event, file) => {
   toast.error('File could not downloaded.', {
     description: file.originalName,
-  })
+  });
 });
 
 ipcRenderer.on('download-cancelled', (event, file) => {
   toast.info('File cancelled to download.', {
     description: file.originalName,
-  })
+  });
 });
-
 
 ipcRenderer.on('conversion-success', (event, result) => {
   console.log('Converted images:', result);
@@ -189,8 +190,6 @@ ipcRenderer.on('conversion-success', (event, result) => {
 ipcRenderer.on('conversion-error', (event, error) => {
   console.log(`Error: ${error}`);
 });
-
-
 </script>
 
 <template lang="pug">

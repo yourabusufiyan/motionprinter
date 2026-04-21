@@ -1,22 +1,39 @@
-/**
- * @see https://www.electron.build/configuration/configuration
- */
 {
   appId: 'com.motionprinter.abusufiyan',
   productName: 'MotionPrinter',
-  copyright: 'Copyright © 2024 Abu Sufiyan',
   asar: true,
   icon: 'public/favicon.ico',
+
   directories: {
     output: 'release/${version}',
   },
-  files: ['dist-electron', 'dist'],
-  asarUnpack: ['dist/assets/*.css'],
+
+  files: [
+    'dist-electron',
+    'dist',
+    {
+      from: 'electron/assets',
+      to: 'assets',
+      filter: ['**/*'],
+    },
+  ],
+
+  extraResources: [
+    {
+      from: 'electron/assets',
+      to: 'assets',
+      filter: ['**/*'],
+    },
+  ],
+
+  asarUnpack: ['dist/assets/*.css', 'assets/**'],
+
   win: {
     target: 'nsis',
     icon: 'public/favicon.ico',
     artifactName: '${productName}-Setup-${version}.${ext}',
   },
+
   nsis: {
     oneClick: false,
     perMachine: true,

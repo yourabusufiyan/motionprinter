@@ -8,4 +8,8 @@
  *
  * @return Formatted string.
  */
-export declare function humanFileSize(bytes: number, si?: boolean, dp?: number): string;
+export declare function humanFileSize(
+  bytes: number,
+  si?: boolean,
+  dp?: number,
+): string;

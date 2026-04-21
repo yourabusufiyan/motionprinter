@@ -1,13 +1,30 @@
 <script setup lang="ts">
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
-const defaultValue = 'Is it free?'
+const defaultValue = 'Is it free?';
 
 const accordionItems = [
-  { title: 'Is it free?', content: 'Yes. MotionPrinter will always be free for your personal uses or commercial uses.' },
-  { title: 'Do i install MotionPrinter in all computer to connect each other', content: 'Yes. You need to install MotionPrinter in all your computers to works smoothly.' },
-  { title: 'Do i need internet connection?', content: 'No! You do not need to be connected with internet. But, You have to be <b>connected to same Network</b>' },
-]
+  {
+    title: 'Is it free?',
+    content:
+      'Yes. MotionPrinter will always be free for your personal uses or commercial uses.',
+  },
+  {
+    title: 'Do i install MotionPrinter in all computer to connect each other',
+    content:
+      'Yes. You need to install MotionPrinter in all your computers to works smoothly.',
+  },
+  {
+    title: 'Do i need internet connection?',
+    content:
+      'No! You do not need to be connected with internet. But, You have to be <b>connected to same Network</b>',
+  },
+];
 </script>
 
 <template lang="pug">
@@ -38,5 +55,4 @@ const accordionItems = [
 .makeHalfScreen {
   min-height: 50vh
 }
-
 </style>

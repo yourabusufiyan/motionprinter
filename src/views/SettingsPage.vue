@@ -1,7 +1,3 @@
-<script setup>
+<script setup></script>
 
-</script>
-
-<template>
-  Setting Page
-</template>
+<template>Setting Page</template>

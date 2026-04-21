@@ -1,14 +1,26 @@
+import sharp from 'sharp';
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { Jimp } from 'jimp';
+import { intToRGBA } from '@jimp/utils';
 
-import sharp from "sharp";
-import PDFDocument from "pdfkit";
-import fs from "fs";
-import path from "path";
-import { Jimp } from "jimp";
-import { intToRGBA } from "@jimp/utils";
+import type { Region } from 'sharp';
+import type { cardMaker, cardMakerPDF } from '../main/express-app-d';
+import { last, toString } from 'lodash';
+import { app } from "electron";
 
-import type { Region } from 'sharp'
-import type { cardMaker, cardMakerPDF } from '../main/express-app-d'
-import { chunk } from "lodash";
+
+// Utility function for resolving assets
+export function getAssetPath(...paths: string[]) {
+  if (app.isPackaged) {
+    // After build → resources/assets/
+    return path.join(process.resourcesPath, "assets", ...paths);
+  } else {
+    // During dev → electron/assets/
+    return path.join(process.cwd(), "electron", "assets", ...paths);
+  }
+}
 
 function areConsecutive(...args: (number | number[])[]): boolean {
   // Normalize input: if first arg is an array, use it, otherwise use args
@@ -29,13 +41,17 @@ function areConsecutive(...args: (number | number[])[]): boolean {
   return true;
 }
 
-export async function cropImage(inputPath: string, outputPath: string, cropOptions: Region): Promise<string> {
+export async function cropImage(
+  inputPath: string,
+  outputPath: string,
+  cropOptions: Region,
+): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
       const roundedCornersSVG = Buffer.from(
         `<svg width="${cropOptions.width}" height="${cropOptions.height}" xmlns="http://www.w3.org/2000/svg">
           <rect x="0" y="0" width="${cropOptions.width}" height="${cropOptions.height}" rx="11.338582677" ry="11.338582677" fill="white" />
-        </svg>`
+        </svg>`,
       );
 
       await sharp(inputPath)
@@ -46,13 +62,13 @@ export async function cropImage(inputPath: string, outputPath: string, cropOptio
           height: cropOptions.height, // Height of the cropped area
         })
         .keepMetadata()
-        .composite([{ input: roundedCornersSVG, blend: "dest-in" }])
+        .composite([{ input: roundedCornersSVG, blend: 'dest-in' }])
         .toFile(outputPath);
-      console.log("Image cropped successfully!", inputPath, outputPath);
-      resolve(outputPath)
+      console.log('Image cropped successfully!', inputPath, outputPath);
+      resolve(outputPath);
     } catch (error) {
-      reject(outputPath)
-      console.error("Error cropping image:", error);
+      reject(outputPath);
+      console.error('Error cropping image:', error);
     }
   });
 }
@@ -62,12 +78,9 @@ export async function extractEshrem(pdf: cardMakerPDF): Promise<cardMakerPDF> {
 
   // Extract the front and back cards
   const inputPath = `${pdf.path}${pdf.cardBoth}` as string;
-  const fileNameWithoutExt = path.basename(
-    inputPath,
-    path.extname(inputPath)
-  );
+  const fileNameWithoutExt = path.basename(inputPath, path.extname(inputPath));
 
-  const frontOutputPath = `${pdf.path}${fileNameWithoutExt}-front.jpg` // Path to save the cropped image
+  const frontOutputPath = `${pdf.path}${fileNameWithoutExt}-front.jpg`; // Path to save the cropped image
   const frontCropOptions = {
     left: 1537,
     top: 477,
@@ -89,22 +102,21 @@ export async function extractEshrem(pdf: cardMakerPDF): Promise<cardMakerPDF> {
   pdf.cardBack = `${fileNameWithoutExt}-back.jpg`;
   pdf.isCropped = true;
 
-  console.log('pdf extracted successfully')
+  console.log('pdf extracted successfully');
 
-  return pdf
+  return pdf;
 }
-
 
 export async function extractAadhaarCard(pdf: cardMakerPDF) {
   return new Promise(async (resolve, reject) => {
     if (pdf.isCropped) return reject(pdf);
 
-    console.time("extractAadhaarCard");
+    console.time('extractAadhaarCard');
 
-    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename))
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
     let inputPath = path.join(pdf.path, pdf.cardBoth as string);
     const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
-    const backOutputPath = path.join(pdf.path, `${cardName}-back`)
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
 
     const BORDER_COLOR = { r: 0, g: 0, b: 0 };
     const COLOR_TOLERANCE = 5;
@@ -135,7 +147,7 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
             !skipped_once &&
             !areConsecutive(borders.concat([y]))
           ) {
-            console.log("skipping rows at", y);
+            console.log('skipping rows at', y);
             y = Math.floor(height * 0.8);
             skipped_once = true;
             continue;
@@ -150,10 +162,8 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
               }
             }
           }
-
-
         }
-        console.log('horizontal borders', borders)
+        console.log('horizontal borders', borders);
         return borders;
       };
 
@@ -164,14 +174,6 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
 
         for (let x = 0; x < width; x++) {
           let borderCount = 0;
-
-          // let skipped_once = false;
-          // if (borders.length && !areConsecutive(borders) && !skipped_once) {
-          //   x = width * 0.47; // Skip next 10 rows to avoid close detections
-          //   console.log('skipping rows to avoid close detections to ', x);
-          //   skipped_once = true;
-          //   continue;
-          // }
 
           for (let y = yStart; y <= yEnd; y++) {
             const idx = (y * width + x) * 4;
@@ -214,12 +216,12 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
 
       // Save regions
       if (regions.length === 0) {
-        console.log("No regions found");
+        console.log('No regions found');
         reject(pdf);
         return;
       }
 
-      console.log('regions', regions)
+      console.log('regions', regions);
 
       let isFront = true;
 
@@ -227,13 +229,10 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
         regions.map(async (region, index) => {
           if (region.w < 100) return region;
 
-          console.log("aaddhar croped", index, frontOutputPath, backOutputPath)
-          console.log("region.w < 100croped", region.w < 100)
-
           let cropped = image.clone().crop(region);
 
           cropped.write(
-            `${isFront ? frontOutputPath : backOutputPath}-full-.png`
+            `${isFront ? frontOutputPath : backOutputPath}-full-.png`,
           );
           let croppedImage = cropped.bitmap;
 
@@ -245,27 +244,167 @@ export async function extractAadhaarCard(pdf: cardMakerPDF) {
               w: croppedImage.width,
               h: croppedImage.height - yPoint,
             })
-            .write(
-              `${isFront ? frontOutputPath : backOutputPath}.png`
-            );
+            .write(`${isFront ? frontOutputPath : backOutputPath}.png`);
           isFront = false;
-        })
+        }),
       );
-      resolve(pdf)
-      console.timeEnd("extractAadhaarCard");
+      console.timeEnd('extractAadhaarCard');
+      resolve(pdf);
       console.log(`Extracted aadhaar card`);
     } catch (error) {
-      console.error("Error:", error);
-      reject(pdf)
+      console.error('Error:', error);
+      reject(pdf);
     }
-  })
+  });
+}
+
+export async function extractPanCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time('extractPanCard');
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
+    const outputFormatFileName = `${path.join(pdf.path, path.basename(inputPath, path.extname(inputPath)))}`;
+
+    let BORDER_COLOR = { r: 31, g: 31, b: 31 };
+    let COLOR_TOLERANCE = 5;
+    let MIN_BORDER_RATIO = 0.65;
+
+    if (pdf?.provider) {
+      if (pdf.provider === 'nsdl') {
+        BORDER_COLOR = { r: 0, g: 0, b: 0 };
+        MIN_BORDER_RATIO = 0.8;
+      } else if (pdf.provider === 'uti') {
+        BORDER_COLOR = { r: 31, g: 31, b: 31 };
+      }
+    }
+
+    try {
+      const image = await Jimp.read(inputPath);
+      const { width, height, data } = image.bitmap;
+
+      // Precalculate pixel check function
+      const isBorder = (r: number, g: number, b: number) =>
+        Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+        Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+        Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+      // Optimized border detection using buffer directly
+      const getHorizontalBorders = () => {
+        const borders = [];
+        const pixelThreshold = width * MIN_BORDER_RATIO;
+        let skipped_once = false;
+
+        for (let y = 0; y < height; y++) {
+          let borderCount = 0;
+          const yOffset = y * width * 4;
+
+          if (
+            borders.length > 2 &&
+            !skipped_once &&
+            !areConsecutive(borders.concat([y]))
+          ) {
+            console.log('skipping rows at', y);
+            y = Math.floor(height * 0.8);
+            skipped_once = true;
+            continue;
+          }
+
+          for (let x = 0; x < width; x++) {
+            const idx = yOffset + x * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(y);
+                break; // Early exit for rows
+              }
+            }
+          }
+        }
+        console.log('horizontal borders', borders);
+        return borders;
+      };
+
+      // Vertical border detection within horizontal regions
+      const getVerticalBorders = (yStart: number, yEnd: number) => {
+        const borders = [];
+        const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+        for (let x = 0; x < width; x++) {
+          let borderCount = 0;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const idx = (y * width + x) * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(x);
+                break; // Early exit for columns
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Main processing
+      const horizontalBorders = getHorizontalBorders();
+      const regions = [];
+
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        if (yEnd - yStart < 5) continue;
+        const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+        // Generate regions
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const region = {
+            x: verticalBorders[j] + 1,
+            y: yStart,
+            w: verticalBorders[j + 1] - verticalBorders[j] - 1,
+            h: yEnd - yStart + 1,
+          };
+
+          if (region.w > 0 && region.h > 0) {
+            regions.push(region);
+          }
+        }
+      }
+
+      // Save regions
+      if (regions.length === 0) {
+        console.log('No regions found');
+        reject(pdf);
+        return;
+      }
+
+      console.log('regions', regions);
+
+      let isFront = true;
+
+      await Promise.all(
+        regions.map(async (region, i) => {
+          if (region.w < 100) return region;
+          await image.clone().crop(region).write(`${outputFormatFileName}.png`);
+        }),
+      );
+      console.timeEnd('extractPanCard');
+      resolve(pdf);
+      console.log(`Extracted Pan Card`, outputFormatFileName);
+    } catch (error) {
+      console.error('Error:', error);
+      reject(pdf);
+    }
+  });
 }
 
 export async function createA4PDFwithEshremCards(obj: cardMaker) {
-
   if (obj?.pdfs) {
-
-    const path = obj.pdfs[0].path
+    const path = obj.pdfs[0].path;
     const pdfs = obj.pdfs;
 
     for (let i = 0; i < pdfs.length; i++) {
@@ -274,19 +413,17 @@ export async function createA4PDFwithEshremCards(obj: cardMaker) {
 
     // Create a new PDF document
     obj.outputFile = `${path}${obj.id}-eshrem.pdf`; // Output PDF file
-    createA4WithImagesPDF(obj)
-
+    createA4WithImagesPDF(obj);
   }
 
   return obj;
-
 }
 
 export async function extractEshramCard(
   imagePath: string,
   outputDir: string,
-  prefix = "image",
-  BORDER_COLOR = { r: 204, g: 204, b: 204 }
+  prefix = 'image',
+  BORDER_COLOR = { r: 204, g: 204, b: 204 },
 ) {
   const COLOR_TOLERANCE = 5; // Allow slight color variations (±5 in RGB values)
   // Require 80% of pixels in a row/column to be border-colored
@@ -297,16 +434,25 @@ export async function extractEshramCard(
     const { width, height } = image.bitmap;
 
     if (width < 500) {
-
-      console.log('having low image auto cropping the image')
+      console.log('having low image auto cropping the image');
       image.autocrop();
       image
         .clone()
-        .crop({ x: 0, y: 0, w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
+        .crop({
+          x: 0,
+          y: 0,
+          w: image.bitmap.width,
+          h: Math.ceil(image.bitmap.height / 2),
+        })
         .write(`${outputDir}/${prefix}-front.png`);
       image
         .clone()
-        .crop({ x: 0, y: Math.floor(image.bitmap.height / 2), w: image.bitmap.width, h: Math.ceil(image.bitmap.height / 2) })
+        .crop({
+          x: 0,
+          y: Math.floor(image.bitmap.height / 2),
+          w: image.bitmap.width,
+          h: Math.ceil(image.bitmap.height / 2),
+        })
         .write(`${outputDir}/${prefix}-back.png`);
 
       return true;
@@ -335,7 +481,7 @@ export async function extractEshramCard(
       }
 
       // Debug: Log detected horizontal borders
-      console.log("Horizontal borders:", horizontalBorders);
+      console.log('Horizontal borders:', horizontalBorders);
 
       // Find vertical borders for each region between horizontal borders
       const regions = [];
@@ -360,7 +506,7 @@ export async function extractEshramCard(
         // Debug: Log detected vertical borders for this region
         console.log(
           `Vertical borders between rows ${yStart}-${yEnd}:`,
-          verticalBorders
+          verticalBorders,
         );
 
         // Find regions between vertical borders
@@ -378,7 +524,7 @@ export async function extractEshramCard(
 
       // Save regions as images
       if (regions.length === 0) {
-        console.log("No regions found. Check border detection above.");
+        console.log('No regions found. Check border detection above.');
         return false;
       }
 
@@ -393,9 +539,264 @@ export async function extractEshramCard(
       return true;
     }
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     return false;
   }
+}
+
+export async function extractNielitStudentIDCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time('extractNielitStudentIDCard');
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const outputFormatFileName = `${path.join(pdf.path, cardName)}`;
+
+    const BORDER_COLOR = { r: 0, g: 0, b: 0 };
+    const COLOR_TOLERANCE = 2;
+    const MIN_BORDER_RATIO = 0.20;
+
+    try {
+      const image = await Jimp.read(inputPath);
+      const { width, height, data } = image.bitmap;
+
+      // Precalculate pixel check function
+      const isBorder = (r: number, g: number, b: number) =>
+        Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+        Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+        Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+      // Optimized border detection using buffer directly
+      const getHorizontalBorders = () => {
+        const borders = [];
+        const pixelThreshold = width * MIN_BORDER_RATIO;
+        let skipped_once = false;
+
+        for (let y = 0; y < height; y++) {
+          let borderCount = 0;
+          const yOffset = y * width * 4;
+
+          for (let x = 0; x < width; x++) {
+            const idx = yOffset + x * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(y);
+                break; // Early exit for rows
+              }
+            }
+          }
+
+
+        }
+        console.log('horizontal borders', borders)
+        return borders;
+      };
+
+      // Vertical border detection within horizontal regions
+      const getVerticalBorders = (yStart: number, yEnd: number) => {
+        const borders = [];
+        const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+        for (let x = 0; x < width; x++) {
+          let borderCount = 0;
+
+          for (let y = yStart; y <= yEnd; y++) {
+            const idx = (y * width + x) * 4;
+            if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+              if (++borderCount > pixelThreshold) {
+                borders.push(x);
+                break; // Early exit for columns
+              }
+            }
+          }
+        }
+        return borders;
+      };
+
+      // Main processing
+      const horizontalBorders = getHorizontalBorders();
+      const regions = [];
+
+      for (let i = 0; i < horizontalBorders.length - 1; i++) {
+        const yStart = horizontalBorders[i] + 1;
+        const yEnd = horizontalBorders[i + 1] - 1;
+
+        if (yEnd - yStart < 5) continue;
+        const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+        // Generate regions
+        for (let j = 0; j < verticalBorders.length - 1; j++) {
+          const region = {
+            x: verticalBorders[j] + 1,
+            y: yStart,
+            w: verticalBorders[j + 1] - verticalBorders[j] - 1,
+            h: yEnd - yStart + 1,
+          };
+
+          if (region.w > 100 && region.h > 100) {
+            regions.push(region);
+          }
+        }
+      }
+
+      // Save regions
+      if (regions.length === 0) {
+        console.log("No regions found");
+        return;
+      }
+
+      console.log('regions', regions)
+
+      await Promise.all(
+        regions.filter(el => el.h > 100 && el.w > 100).map(async (region, index) => {
+          console.log('cropping region', `${outputFormatFileName}-${index == 0 ? 'front' : 'back'}.png`)
+          await image.clone().crop(region).write(`${outputFormatFileName}-${index == 0 ? 'front' : 'back'}.png`);
+        })
+      );
+      console.timeEnd("extractNielitStudentIDCard");
+      resolve(pdf);
+      console.log(`Extracted nielit student id card`);
+    } catch (error) {
+      console.error("Error:", error);
+      console.timeEnd("extractNielitStudentIDCard");
+      reject(pdf);
+    }
+  });
+}
+
+export async function extractRationCard(pdf: cardMakerPDF) {
+  return new Promise(async (resolve, reject) => {
+    if (pdf.isCropped) return reject(pdf);
+
+    console.time('extractRationCard');
+
+    let cardName = path.basename(pdf?.filename, path.extname(pdf?.filename));
+    let inputPath = path.join(pdf.path, pdf.cardBoth as string);
+    const backOutputPath = path.join(pdf.path, `${cardName}-back`);
+    const frontOutputPath = path.join(pdf.path, `${cardName}-front`);
+    const outputFormatFileName = `${path.join(pdf.path, cardName)}`;
+
+    const BORDER_COLOR = { r: 0, g: 0, b: 0 };
+    const COLOR_TOLERANCE = 5;
+    const MIN_BORDER_RATIO = 0.70;
+
+    await ([{ inputPath: path.join(pdf.path, `${cardName}-1.png`), output: frontOutputPath },
+    { inputPath: path.join(pdf.path, `${cardName}-2.png`), output: backOutputPath }
+    ].forEach(async el => {
+      try {
+        const image = await Jimp.read(el.inputPath);
+        const { width, height, data } = image.bitmap;
+
+        // Precalculate pixel check function
+        const isBorder = (r: number, g: number, b: number) =>
+          Math.abs(r - BORDER_COLOR.r) <= COLOR_TOLERANCE &&
+          Math.abs(g - BORDER_COLOR.g) <= COLOR_TOLERANCE &&
+          Math.abs(b - BORDER_COLOR.b) <= COLOR_TOLERANCE;
+
+        // Optimized border detection using buffer directly
+        const getHorizontalBorders = () => {
+          const borders = [];
+          const pixelThreshold = width * MIN_BORDER_RATIO;
+          let skipped_once = false;
+
+          for (let y = 0; y < height; y++) {
+            let borderCount = 0;
+            const yOffset = y * width * 4;
+
+            for (let x = 0; x < width; x++) {
+              const idx = yOffset + x * 4;
+              if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+                if (++borderCount > pixelThreshold) {
+                  borders.push(y);
+                  break; // Early exit for rows
+                }
+              }
+            }
+
+
+          }
+          console.log('horizontal borders', borders)
+          return borders;
+        };
+
+        // Vertical border detection within horizontal regions
+        const getVerticalBorders = (yStart: number, yEnd: number) => {
+          const borders = [];
+          const pixelThreshold = (yEnd - yStart + 1) * MIN_BORDER_RATIO;
+
+          for (let x = 0; x < width; x++) {
+            let borderCount = 0;
+
+            for (let y = yStart; y <= yEnd; y++) {
+              const idx = (y * width + x) * 4;
+              if (isBorder(data[idx], data[idx + 1], data[idx + 2])) {
+                if (++borderCount > pixelThreshold) {
+                  borders.push(x);
+                  break; // Early exit for columns
+                }
+              }
+            }
+          }
+          return borders;
+        };
+
+        // Main processing
+        const horizontalBorders = getHorizontalBorders();
+        const regions = [];
+
+        for (let i = 0; i < horizontalBorders.length - 1; i++) {
+          const yStart = horizontalBorders[i] + 1;
+          const yEnd = horizontalBorders[i + 1] - 1;
+
+          if (yEnd - yStart < 5) continue;
+          const verticalBorders = getVerticalBorders(yStart, yEnd);
+
+          // Generate regions
+          for (let j = 0; j < verticalBorders.length - 1; j++) {
+            const region = {
+              x: verticalBorders[j] + 1 + 2,
+              y: yStart + 2,
+              w: verticalBorders[j + 1] - verticalBorders[j] - 1 - 4,
+              h: yEnd - yStart + 1 - 2,
+            };
+
+            if (region.w > 100 && region.h > 100) {
+              regions.push(region);
+            }
+          }
+        }
+
+        // Save regions
+        if (regions.length === 0) {
+          console.log("No regions found");
+          return;
+        }
+
+        console.log('regions', regions)
+
+        await Promise.all(
+          regions.filter(el => el.h > 100 && el.w > 100).map(async (region, index) => {
+            if (index) return;
+            await image.clone().crop(region).write(`${el.output}.png`);
+          })
+        );
+
+        console.timeEnd("extractRationCard");
+        resolve(pdf);
+        console.log(`Extracted ration card`);
+      } catch (error) {
+        console.error("Error:", error);
+        console.timeEnd("extractRationCard");
+        reject(pdf);
+      }
+    }))
+
+
+  });
 }
 
 export async function createA4WithImagesPDF(maker: cardMaker) {
@@ -404,86 +805,115 @@ export async function createA4WithImagesPDF(maker: cardMaker) {
     const dpi = 300; // 300 DPI for high quality
     const mmToPx = (mm: number) => Math.round((mm / 25.4) * dpi); // Convert mm to pixels
     // Convert position and size to points (72 points per inch)
-    const mmToPt = (mm: number) => (mm / 25.4) * 72;
+    const mmToPt = (mm: number) => mm * 72 / 25.4;
 
     const atmWidthPx = mmToPx(85.6); // ATM card width in pixels
     const atmHeightPx = mmToPx(53.98); // ATM card height in pixels
     const atmWidthMM = 85.6; // ATM card width in mm
     const atmHeightMM = 53.98; // ATM card height in mm
 
-
     // Create a new PDF document
     const doc = new PDFDocument({
-      size: "A4", // Set page size to A4
-      layout: "portrait",
-
+      size: 'A4', // Set page size to A4
+      layout: 'portrait',
     });
 
     // Pipe the PDF to a file
     const writeStream = fs.createWriteStream(maker.outputFile as string);
     doc.pipe(writeStream);
 
+    // Get page width and height
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const middleX = pageWidth / 2; // Vertical line in the middle
 
-    let count = 0
-    // let margin = 10
-    let top = 3.136
+    let count = 0;
+    let top = 4.5083;
+    let cardHeight = mmToPt(53.98);
+    let cardWidth = mmToPt(85.6);
+    console.log(cardWidth, cardHeight);
+
 
     for (let pdf of maker.pdfs as cardMakerPDF[]) {
 
       if (count === 5) {
         doc.addPage(); // Add a new page
-        top = 3.136
+        top = 4.5083;
         count = 0;
       }
 
+      // Draw vertical dashed line
+      doc
+        .moveTo(middleX, 0)            // top center
+        .lineTo(middleX, mmToPt(top + 2.2541) + cardHeight)   // bottom center
+        .dash(5, { space: 5 })         // dashed pattern
+        .lineWidth(0.5)
+        .strokeColor('lightgray')
+        .stroke();
+
       // Resize the images to ATM card size
-      const basePath = pdf.path
+      const basePath = pdf.path;
       const front = await sharp(path.join(basePath, pdf.cardFront as string))
-        .resize(atmWidthPx, atmHeightPx, { fit: "fill" })
+        .resize(atmWidthPx, atmHeightPx, { fit: 'fill' })
         .toBuffer();
 
       const back = await sharp(path.join(basePath, pdf.cardBack as string))
-        .resize(atmWidthPx, atmHeightPx, { fit: "fill" })
+        .resize(atmWidthPx, atmHeightPx, { fit: 'fill' })
         .toBuffer();
 
       doc
-        .image(front, mmToPt(12.86), mmToPt(top), {
-          width: 250,
-          height: 158,
+        .image(front, mmToPt(9.7), mmToPt(top), {
+          width: cardWidth,
+          height: cardHeight,
         })
-        .rect(mmToPt(12.86) + 0.055, mmToPt(top) + 0.05, 250 - 0.1, 158 - 0.1)
+        .rect(mmToPt(9.7) + 0.055, mmToPt(top) + 0.05, cardWidth - 0.1, cardHeight - 0.1,)
         .lineWidth(0.1)
-        .strokeColor("black")
+        .undash()
+        .strokeColor('black')
         .stroke();
 
       doc
-        .image(back, mmToPt(108.0338), mmToPt(top), {
-          width: 250,
-          height: 158,
+        .image(back, mmToPt(114.7), mmToPt(top), {
+          width: cardWidth,
+          height: cardHeight,
         })
-        .rect(mmToPt(108.0338) + 0.055, mmToPt(top) + 0.05, 250 - 0.1, 158 - 0.1)
+        .rect(
+          mmToPt(114.7) + 0.055,
+          mmToPt(top) + 0.05,
+          cardWidth - 0.1,
+          cardHeight - 0.1,
+        )
         .lineWidth(0.1)
-        .strokeColor("black")
+        .strokeColor('black')
         .stroke();
 
-      top += 58.5748
-      count++
+      top += 53.99 + 4.5083; // card height with 1mm stroke
+      count++;
+
+      if (count != 5) {
+        // Draw horizontal dashed line
+        doc
+          .moveTo(0, mmToPt(top - 2.2541))            // left middle
+          .lineTo(pageWidth, mmToPt(top - 2.2541))    // right middle
+          .dash(5, { space: 5 })     // dashed pattern
+          .lineWidth(0.5)
+          .strokeColor('lightgray')
+          .stroke();
+      }
 
     }
-
 
     // Finalize the PDF
     doc.end();
 
     // Wait for the write stream to finish
-    writeStream.on("finish", () => {
-      console.log("PDF created successfully:", maker.outputFile);
+    writeStream.on('finish', () => {
+      console.log('PDF created successfully:', maker.outputFile);
       return true;
     });
     return true;
   } catch (error) {
-    console.error("Error creating PDF:", error);
+    console.error('Error creating PDF:', error);
     return false;
   }
 }
-

@@ -13,6 +13,8 @@
     "package.json",
     "electron",
     "src/declarations/",
-    "helpers"
+    "helpers",
+    "electron/main/index.ts",
+    "global.d.ts"
   ]
 }

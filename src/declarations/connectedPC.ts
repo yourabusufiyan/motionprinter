@@ -3,4 +3,3 @@ export type computerProfile = {
   name: string;
   paperSizes: string | string[];
 };
-

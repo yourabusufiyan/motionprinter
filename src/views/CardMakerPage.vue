@@ -7,14 +7,17 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from '@/components/ui/card';
 
 const cards = ref([
-  { title: "E-Shrem", thumbnail: "https://placehold.jp/150x150.png?text=E-Shrem", to: '{name: "eshrem"}' }
-])
+  {
+    title: 'E-Shrem',
+    thumbnail: 'https://placehold.jp/150x150.png?text=E-Shrem',
+    to: '{name: "eshrem"}',
+  },
+]);
 
 console.log('[App.vue]', `IdMakerPage.vue ended`);
-
 </script>
 
 <template lang="pug">

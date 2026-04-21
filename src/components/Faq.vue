@@ -1,15 +1,36 @@
 <script setup lang="ts">
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
-const defaultValue = 'Is it free?'
-
+const defaultValue = 'Is it free?';
 
 const accordionItems = [
-  { title: 'Is it free?', content: 'Yes, Absolutely! MotionPrinter is provided free of charge for both personal and commercial use, allowing users to benefit from its full functionality without any associated costs, regardless of the intended purpose.' },
-  { title: 'Is installation of MotionPrinter required on all computers for connectivity?', content: 'Yes, MotionPrinter must be installed on all of your computers to ensure seamless and efficient operation across the network.' },
-  { title: 'Is an internet connection required?', content: 'No, an internet connection is not required. However, all devices must be connected to the same local network to ensure proper functionality and seamless communication between them.' },
-  { title: 'Does MotionPrinter retain a history of printed files?', content: 'Yes, MotionPrinter maintains a history of printed files. You can view this history by selecting the "History" navigation button located in the sidebar of the MotionPrinter interface.' },
-]
+  {
+    title: 'Is it free?',
+    content:
+      'Yes, Absolutely! MotionPrinter is provided free of charge for both personal and commercial use, allowing users to benefit from its full functionality without any associated costs, regardless of the intended purpose.',
+  },
+  {
+    title:
+      'Is installation of MotionPrinter required on all computers for connectivity?',
+    content:
+      'Yes, MotionPrinter must be installed on all of your computers to ensure seamless and efficient operation across the network.',
+  },
+  {
+    title: 'Is an internet connection required?',
+    content:
+      'No, an internet connection is not required. However, all devices must be connected to the same local network to ensure proper functionality and seamless communication between them.',
+  },
+  {
+    title: 'Does MotionPrinter retain a history of printed files?',
+    content:
+      'Yes, MotionPrinter maintains a history of printed files. You can view this history by selecting the "History" navigation button located in the sidebar of the MotionPrinter interface.',
+  },
+];
 </script>
 
 <template lang="pug">

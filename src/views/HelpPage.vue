@@ -1,12 +1,13 @@
 <script lang="ts" setup>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, defineAsyncComponent } from 'vue';
 
-const Help = defineAsyncComponent(() => import('@/components/Help.vue'))
-const Faq = defineAsyncComponent(() => import('@/components/Faq.vue'))
-const AboutUs = defineAsyncComponent(() => import('@/components/AboutUs.vue'))
+const Help = defineAsyncComponent(() => import('@/components/Help.vue'));
+const Faq = defineAsyncComponent(() => import('@/components/Faq.vue'));
+const AboutUs = defineAsyncComponent(() => import('@/components/AboutUs.vue'));
+import Footer from '@/components/Footer.vue';
+
 
 </script>
-
 
 <template lang="pug">
 .help-page
@@ -15,4 +16,5 @@ const AboutUs = defineAsyncComponent(() => import('@/components/AboutUs.vue'))
   .faq-container
     Faq
     .divider.border-b.border-white.border-b.border-gray-200.w-64.mx-auto.my-10
+Footer
 </template>

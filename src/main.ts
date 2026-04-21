@@ -6,8 +6,10 @@ import App from './App.vue';
 import './samples/node-api';
 import router from './router/router';
 
-import Vue3ColorPicker from "vue3-colorpicker";
-import "vue3-colorpicker/style.css";
+import Vue3ColorPicker from 'vue3-colorpicker';
+import 'vue3-colorpicker/style.css';
+
+import AnimatedCounter from "vue-animated-counter"
 
 const app = createApp(App);
 
@@ -16,10 +18,10 @@ const messages = Object.fromEntries(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     import.meta.glob<{ default: any }>('./locales/*.json', {
       eager: true,
-    })
+    }),
   ).map(([key, value]) => {
     return [key.slice(10, -5), value.default];
-  })
+  }),
 );
 
 app.use(
@@ -29,11 +31,13 @@ app.use(
     fallbackLocale: 'en',
     warnHtmlMessage: false,
     messages,
-  })
+  }),
 );
 app.use(createPinia());
 app.use(router);
 app.use(Vue3ColorPicker);
+
+app.component("AnimatedCounter", AnimatedCounter);
 
 app.mount('#app').$nextTick(() => {
   postMessage({ payload: 'removeLoading' }, '*');

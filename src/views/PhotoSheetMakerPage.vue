@@ -66,6 +66,7 @@ const pdfContent = ref<HTMLElement | null>(null);
 const isPrinting = ref(false);
 const isPdfDownloading = ref(false);
 const defaultAccordion = 'options';
+const fitToFrame = ref(true)
 
 // Constants
 const gridLayouts = [
@@ -73,6 +74,7 @@ const gridLayouts = [
   { label: '1 Photo', value: '1x1' },
   { label: '2 Photos', value: '1x2' },
   { label: '4 Photos', value: '2x2' },
+  { label: '6 Photos', value: '2x3' },
   { label: '9 Photos', value: '3x3' },
   { label: '16 Photos', value: '4x4' },
   { label: '24 Photos', value: '4x6' },
@@ -395,6 +397,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
             PhotoItem(
               v-if="currentPage.photos[index]"
               :photo="currentPage.photos[index]"
+              :fitToFrame="fitToFrame"
               @remove="removePhoto(currentPageIndex, index)"
               :update-photo="currentPage.photos[index]"
             )
@@ -411,9 +414,10 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
       @change="handleFileSelect"
     )
     pre.hidden {{ currentPage}}
-    .photo-option.sticky.bottom-0.bg-red-500.px-6.py-1
-      Checkbox#fit-to-frame
-      Label(for="fit-to-frame") Fit Picture to Frame
+    .photo-option.sticky.bottom-0.bg-white.px-6.py-2.border-t.border-gray-200(style="box-shadow: 0 0 7px 0 #0000002b;")
+      .fit-to-frame.flex.gap-2.justify-center.items-center
+        Checkbox#fit-to-frame(v-model="fitToFrame")
+        Label(for="fit-to-frame") Fit Picture to Frame
   .scroll-container.right-container.w-52.border-l.flex.flex-col.space-y-4
     .info.px-6.pt-2
       p.text-sm Photo Size : 

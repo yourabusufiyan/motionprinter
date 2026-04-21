@@ -8,7 +8,8 @@ const props = defineProps<{
     zoom: number;
     rotation: number;
     position: { x: number; y: number };
-  };
+  },
+  fitToFrame: boolean
 }>();
 
 // Define emits
@@ -24,6 +25,7 @@ const startPos = ref({ x: 0, y: 0 });
 // Computed style for image transformation
 const imageStyle = computed(() => ({
   transform: `translate(${position.value.x}px, ${position.value.y}px) scale(${zoom.value}) rotate(${rotation.value}deg)`,
+  'object-fit': props.fitToFrame ? 'cover' : 'contain'
 }));
 
 // Watch for prop changes (if needed)

@@ -34,6 +34,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/PhotoSheetMakerPage.vue'),
   },
   {
+    path: '/oropdf',
+    name: 'oropdf',
+    component: () => import('../views/OroPDFPage.vue'),
+  },
+  {
     path: '/connected-pc',
     name: 'connected-pc',
     component: () => import('../views/ConnectedPC.vue'),

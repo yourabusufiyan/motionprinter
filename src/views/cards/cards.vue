@@ -654,7 +654,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
         width="100%",
         height="600px"
       )
-pre {{ page }}
+pre.hidden {{ page }}
 </template>
 
 <style lang="stylus" scoped>

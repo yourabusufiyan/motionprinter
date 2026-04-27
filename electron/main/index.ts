@@ -303,6 +303,7 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
           path.extname(file.originalName as string),
         )
         .toUpperCase();
+        
     opts.args = {
       opw: filePassword,
       upw: filePassword,

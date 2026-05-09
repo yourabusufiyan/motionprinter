@@ -64,6 +64,7 @@ type cardType =
   | 'pan'
   | 'voter_new'
   | 'ration'
+  | 'udid'
   | null;
 
 interface RepeaterItem {
@@ -100,10 +101,11 @@ const options = ref(
     { label: 'Pan Card', value: 'pan' },
     { label: 'Voter ID(New/e-EPIC) Card', value: 'voter_new' },
     { label: 'ABC', value: 'abc_apaar' },
-    { label: 'APAAR', value: 'apaar' },
+    { label: 'APAAR(Cooming Soon)', value: 'apaar', disabled: true },
     { label: 'CSC ID Card', value: 'csc_id' },
     { label: 'NIELIT Student ID Card', value: 'nielit_student_id' },
     { label: 'Ration Card', value: 'ration' },
+    { label: 'UDID Card', value: 'udid' },
   ].sort((a, b) => {
     if (b.value == 'custom') return 1;
     return a.label.localeCompare(b.label);
@@ -487,6 +489,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
               v-for="option in options"
               :key="option.value"
               :value="option.value"
+              :disabled="option.disabled || false"
             ) {{ option.label }}
 
       .select-container.w-40.place-self-end(v-if="field.cardType === 'pan'")
@@ -654,7 +657,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
         width="100%",
         height="600px"
       )
-pre {{ page }}
+pre.hidden {{ page }}
 </template>
 
 <style lang="stylus" scoped>

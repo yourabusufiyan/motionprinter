@@ -9,19 +9,22 @@ import {
   TokensIcon,
   ChatBubbleIcon,
 } from '@radix-icons/vue';
-import { Network, IdCard, Grid2x2 } from 'lucide-vue-next';
+import { Network, IdCard, Grid2x2, FileBox } from 'lucide-vue-next';
 import AnimatedCounter from "vue-animated-counter"
 import NumberFlow from '@number-flow/vue'
 import userCount from './userCount.vue';
 
 import { ipcRenderer } from 'electron';
 import { random } from 'lodash';
-import { sleep } from '../../helpers/both'
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 const routes = ref([
   { path: '/home', display: 'Home' },
   { path: '/card-maker', display: 'Card Maker' },
   { path: '/photosheet-maker', display: 'Photo Sheet' },
+  { path: '/oropdf', display: 'OroPDF' },
   { path: '/connected-pc', display: 'Connected PC' },
   { path: '/history', display: 'History' },
 ]);
@@ -93,7 +96,7 @@ aside.top-0.left-0.fixed
       )
         | MotionPrinter
         span(href="https://en.wikipedia.org/wiki/Palestine" target="_blank")
-          span.text-base.align-top(title="Free Palestine") 🍉
+          span.text-base.align-top(title="We support Palestine!") 🍉
       code.text-xs.block.text-gray-500.m-0.p-0 Beta #[span(class="font-mono dark:text-slate-300") v{{ version }}]
       p.text-sm.text-slate-600.leading-tight.mt-1(
         class="dark:text-slate-300"
@@ -115,6 +118,7 @@ aside.top-0.left-0.fixed
           HomeIcon(v-if="r.path == '/home'")
           IdCard(stroke-width="2" size="16" v-if="r.path == '/card-maker'")
           Grid2x2(stroke-width="2" size="16" v-else-if="r.path == '/photosheet-maker'")
+          FileBox(stroke-width="2" size="16" v-else-if="r.path == '/oropdf'")
           Network(stroke-width="1" size="16" v-else-if="r.path == '/connected-pc'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           ChatBubbleIcon(stroke-width="2" size="16" v-else-if="r.path == '/inbox'")

@@ -1,3 +1,10 @@
+1.1.5
+* Added👍
+  1. OroPDF
+    a. PDF to Image
+  2. Card Maker
+    a. UDID card added
+
 1.1.4
 * Added👍
   1. Water Melon after MotionPrinter

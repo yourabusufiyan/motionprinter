@@ -516,6 +516,10 @@ class expressAppClass {
         })),
       });
     });
+
+    // OroPDF
+    this.router.post('/upload-pdf', this.uploadPDFWithPassword.bind(this));
+    this.router.post('/verify-pdf-password', this.verifyPDFPassword.bind(this));
   }
 
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
@@ -803,6 +807,176 @@ class expressAppClass {
       },
     );
   }
+
+  // OroPDF
+static async uploadPDFWithPassword(req: Request, res: Response) {
+  try {
+    const { password, temp, addedBy, addedTo, printOptions } = req.body;
+    
+    if (!req.files || !req.files.pdfFile) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+
+    const pdfFile = req.files.pdfFile as UploadedFile;
+    const newFileName = uuidv7() + '.pdf';
+    const uploadPath = temp === 'true' 
+      ? join(this.dir[3], newFileName)
+      : join(this.dir[1], newFileName);
+
+    // Save file temporarily
+    await pdfFile.mv(uploadPath);
+
+    // Check if PDF is password protected and verify password
+    const pdfInfo = await this.checkPDFProtection(uploadPath, password);
+
+    if (pdfInfo.isProtected && !pdfInfo.passwordVerified) {
+      // Delete the temporary file since password is wrong
+      fs.unlinkSync(uploadPath);
+      return res.status(401).json({ 
+        error: 'PDF is password protected and password is incorrect',
+        requiresPassword: true,
+        filename: pdfFile.name
+      });
+    }
+
+    // Create file record
+    const fileData: uploadFile = {
+      originalName: pdfFile.name,
+      encoding: pdfFile.encoding,
+      mimetype: pdfFile.mimetype,
+      destination: uploadPath,
+      filename: newFileName,
+      path: temp === 'true' ? this.dir[3] : this.dir[1],
+      size: pdfFile.size,
+      temp: temp === 'true',
+      isPasswordProtected: pdfInfo.isProtected,
+      password: password || null
+    };
+
+    const commandFile: toPrintsCommandsFile = {
+      ...fileData,
+      uploaded: true,
+      addedTime: Date.now(),
+      isPrinted: false,
+      addedBy: addedBy || null,
+      addedTo: addedTo || null,
+      printOptions: printOptions ? JSON.parse(printOptions) : null,
+    };
+
+    // Store in appropriate database
+    if (temp === 'true') {
+      this.db.data.temp.push(commandFile);
+    } else {
+      this.db.data.toPrintsCommands.push(commandFile);
+    }
+
+    this.db.write();
+    this.win?.webContents.send('reloadDatabase');
+
+    res.json({
+      success: true,
+      file: commandFile,
+      pdfInfo: {
+        isProtected: pdfInfo.isProtected,
+        numPages: pdfInfo.numPages
+      }
+    });
+
+  } catch (error) {
+    console.error('Error uploading PDF:', error);
+    res.status(500).json({ error: 'Failed to upload PDF' });
+  }
+}
+
+// Method to check PDF protection and verify password
+static async checkPDFProtection(filePath: string, password?: string): Promise<{
+  isProtected: boolean;
+  passwordVerified: boolean;
+  numPages?: number;
+}> {
+  try {
+    // Use pdf-parse or similar library to check PDF
+    const pdfParse = require('pdf-parse');
+    
+    let dataBuffer = fs.readFileSync(filePath);
+    
+    try {
+      // Try to parse without password first
+      const data = await pdfParse(dataBuffer);
+      return {
+        isProtected: false,
+        passwordVerified: true,
+        numPages: data.numpages
+      };
+    } catch (error: any) {
+      // If error indicates password protection
+      if (error.message && error.message.includes('password')) {
+        if (password) {
+          // Try with password
+          try {
+            const data = await pdfParse(dataBuffer, { password });
+            return {
+              isProtected: true,
+              passwordVerified: true,
+              numPages: data.numpages
+            };
+          } catch (passwordError) {
+            return {
+              isProtected: true,
+              passwordVerified: false
+            };
+          }
+        }
+        return {
+          isProtected: true,
+          passwordVerified: false
+        };
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error checking PDF protection:', error);
+    return {
+      isProtected: false,
+      passwordVerified: false
+    };
+  }
+}
+
+static async verifyPDFPassword(req: Request, res: Response) {
+  const { filename, password } = req.body;
+  
+  try {
+    const file = find(this.db.data.toPrintsCommands, ['filename', filename]);
+    
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    
+    const pdfInfo = await this.checkPDFProtection(file.destination, password);
+    
+    if (pdfInfo.passwordVerified) {
+      // Update file with correct password
+      file.password = password;
+      this.db.write();
+      
+      res.json({ 
+        verified: true, 
+        message: 'Password verified successfully',
+        numPages: pdfInfo.numPages
+      });
+    } else {
+      res.status(401).json({ 
+        verified: false, 
+        error: 'Incorrect password' 
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to verify password' });
+  }
+}
+
+
 }
 
 export default expressAppClass;

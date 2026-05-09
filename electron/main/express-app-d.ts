@@ -20,6 +20,9 @@ export type uploadFile = {
   path: string;
   size: number;
   temp?: boolean;
+  isPasswordProtected?: boolean;
+  password: null
+
 };
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -30,6 +33,8 @@ export type toPrintsCommandsFile = uploadFile & {
   isPrinted: boolean;
   addedTime: Date | number;
   printerName?: string | undefined;
+  password?: string | null;
+  uploaded?: boolean;
 };
 
 export type Trash = toPrintsCommandsFile & {
@@ -67,12 +72,14 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   | 'csc_id'
   | 'nielit_student_id'
   | 'ration'
+  | 'udid'
   | null;
   provider?: 'uti' | 'nsdl' | null;
   abcTo?: 'abc' | 'apaar' | null;
   password?: string | null;
   errorMessage?: string | null;
   warningMessage?: string | null;
+  dpi?: number | null;
 };
 
 export type cardMaker = {

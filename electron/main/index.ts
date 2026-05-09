@@ -270,7 +270,8 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
   return new Promise(async (resolve, reject) => {
     console.time('pdf2image');
 
-    let opts = {
+
+    let opts: any = {
       format: 'png',
       scale: 3_508,
       out_dir: path.dirname(file.destination),
@@ -279,7 +280,7 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
         path.extname(file.destination),
       ),
       page: null,
-      args: {},
+      args: {}
     };
 
     console.log(
@@ -303,22 +304,25 @@ async function pdf2image(file: cardMakerPDF): Promise<cardMakerPDF> {
           path.extname(file.originalName as string),
         )
         .toUpperCase();
-    opts.args = {
-      opw: filePassword,
-      upw: filePassword,
-    };
+
+    opts.args.opw = filePassword;
+    opts.args.upw = filePassword;
 
     console.log('pdf.info', file.destination, opts);
     pdf
       .info(file.destination, opts)
       .then((pdfinfo: any) => {
-        opts.scale = Math.floor(Math.abs(pdfinfo.height_in_pts * (300 / 72)));
+
 
         if (file.cardType == 'aadhaar') {
           opts.scale = Math.floor(Math.abs(pdfinfo.width_in_pts * (240 / 72)));
-        }
-        if (file.cardType == 'nielit_student_id') {
+        } else if (file.cardType == 'nielit_student_id') {
           opts.scale = 5262;
+        } else if (file.cardType == 'udid') {
+          opts.args.r = file.dpi;
+          opts.scale = Math.floor(Math.abs(pdfinfo.height_in_pts * (300 / 72)));
+        } else {
+          opts.scale = Math.floor(Math.abs(pdfinfo.height_in_pts * (300 / 72)));
         }
 
         opts = merge({}, opts, file?.opts);
@@ -652,7 +656,12 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
             }
           }
         );
-      } else if (['abha', 'ayushman', 'voter_new', 'abc_apaar'].includes(card?.cardType as string)) {
+      } else if (['abha', 'ayushman', 'voter_new', 'abc_apaar', 'udid'].includes(card?.cardType as string)) {
+
+        if (card?.cardType == 'udid') {
+          card.dpi = 300;
+        }
+
         pdf2image(card)
           .then(async (newCard: cardMakerPDF) => {
             // @ts-ignore
@@ -711,6 +720,16 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               frontCropOptions.top = 15;
               frontCropOptions.width = 1296;
               frontCropOptions.height = 1009;
+            } else if (card.cardType == 'udid') {
+              frontCropOptions.left = 216;
+              frontCropOptions.top = 1139;
+              frontCropOptions.width = 1046;
+              frontCropOptions.height = 653;
+
+              backCropOptions.left = 216;
+              backCropOptions.top = 212;
+              backCropOptions.width = 1046;
+              backCropOptions.height = 653;
             }
 
 
@@ -885,7 +904,7 @@ ipcMain.on(
       head: string;
       printSheet?: boolean;
       filename?: string;
-      saveAs?: 'pdf' | 'png' | 'jpg';
+      saveAs?: 'pdf' | 'png' | 'jpg' | 'tiff';
     },
   ) => {
 
@@ -959,26 +978,26 @@ ipcMain.on(
       // Save to temp
       fs.writeFileSync(tempFile, data);
 
-      if(obj?.printSheet) {
+      if (obj?.printSheet) {
         print(tempFile, { silent: false, printDialog: true })
-        .then(() => {
-          console.log(`Printed file: ${tempFile}`);
-          win.close();
-          event.reply('generate-pdf-reply', {
-            success: true,
-            message: 'Photosheet is send to print.',
+          .then(() => {
+            console.log(`Printed file: ${tempFile}`);
+            win.close();
+            event.reply('generate-pdf-reply', {
+              success: true,
+              message: 'Photosheet is send to print.',
+            });
+            return;
+          })
+          .catch((err) => {
+            console.error(`Error printing file: ${tempFile}`, err);
+            win.close();
+            event.reply('generate-pdf-reply', {
+              success: false,
+              message: 'something went wrong during sending to print.',
+            });
+            return;
           });
-          return; 
-        })
-        .catch((err) => {
-          console.error(`Error printing file: ${tempFile}`, err);
-          win.close(); 
-          event.reply('generate-pdf-reply', {
-            success: false,
-            message: 'something went wrong during sending to print.',
-          });
-          return; 
-        });
       }
 
       if (!!obj?.saveAs) {
@@ -1040,10 +1059,10 @@ ipcMain.on(
               defaultExt = '.tiff';
               defaultTitle = "Save TIFF";
               break;
-          
+
             default:
               break;
-          }          
+          }
 
           let opts = {
             format: obj?.saveAs,

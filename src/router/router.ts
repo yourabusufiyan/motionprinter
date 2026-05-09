@@ -2,6 +2,7 @@ import { createWebHistory, createRouter, RouteRecordRaw } from 'vue-router';
 
 import { useLordStore } from '@/stores/LordStore';
 import CardMakerRoutes from './cardmaker-routes'; // Import nested routes
+import path from 'path';
 
 console.log('[App.vue]', `router started`);
 
@@ -37,6 +38,11 @@ const routes: RouteRecordRaw[] = [
     path: '/oropdf',
     name: 'oropdf',
     component: () => import('../views/OroPDFPage.vue'),
+  },
+  {
+    path: '/oropdf/pdf-to-jpg',
+    name: 'pdf-to-jpg',
+    component: () => import('../views/oropdf/PDFToJPGConverterPage.vue'),
   },
   {
     path: '/connected-pc',

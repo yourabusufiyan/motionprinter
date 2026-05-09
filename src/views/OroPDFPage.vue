@@ -8,10 +8,10 @@
 
   //- Tools Grid
   .tools-grid
-    .tool-card(
+    router-link.tool-card(
       v-for="tool in toolsToShow"
       :key="tool.id"
-      @click="onToolClick(tool)"
+      :to="{name: tool.routName}"
     )
       .tool-icon(:class="`ic-${tool.color}`")
         component(:is="'svg'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="tool.iconPath")
@@ -28,7 +28,9 @@ interface Tool {
   color: string
   iconPath: string
   isAi?: boolean
-  display: boolean
+  display: boolean,
+  path?: string
+  routName?: string
 }
 
 const tools: Tool[] = [
@@ -38,7 +40,9 @@ const tools: Tool[] = [
     description: 'save each page as a separate JPG image',
     color: 'teal',
     iconPath: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="10" cy="13" r="2"/><path d="M20 17l-2.5-2.5L15 17"/>',
-    display: true
+    display: true,
+    path: '/oropdf/pdf-to-jpg',
+    routName: 'pdf-to-jpg',
   },
   {
     id: 'pdf-to-png',

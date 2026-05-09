@@ -20,6 +20,9 @@ export type uploadFile = {
   path: string;
   size: number;
   temp?: boolean;
+  isPasswordProtected?: boolean;
+  password: null
+
 };
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -30,6 +33,8 @@ export type toPrintsCommandsFile = uploadFile & {
   isPrinted: boolean;
   addedTime: Date | number;
   printerName?: string | undefined;
+  password?: string | null;
+  uploaded?: boolean;
 };
 
 export type Trash = toPrintsCommandsFile & {

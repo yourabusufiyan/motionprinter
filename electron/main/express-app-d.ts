@@ -72,12 +72,14 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   | 'csc_id'
   | 'nielit_student_id'
   | 'ration'
+  | 'udid'
   | null;
   provider?: 'uti' | 'nsdl' | null;
   abcTo?: 'abc' | 'apaar' | null;
   password?: string | null;
   errorMessage?: string | null;
   warningMessage?: string | null;
+  dpi?: number | null;
 };
 
 export type cardMaker = {

@@ -1,6 +1,6 @@
 {
-  appId: 'com.motionprinter.abusufiyan',
-  productName: 'MotionPrinter',
+  appId: 'com.oroprinter.abusufiyan',
+  productName: 'OroPrinter',
   asar: true,
   icon: 'public/favicon.ico',
 

@@ -1,4 +1,4 @@
-=== MotionPrinter ===
+=== OroPrinter ===
 Contributors : yourabusufiyan
 Author:  Abu Sufiyan
 Author URI: https://github.com/yourabusufiyan/
@@ -8,7 +8,7 @@ Any of the them, i forget to to credit. let me know i will
 add. Any of the libraries/plugin/software credits goes to 
 its Author. 
 
-MotionPrinter bundles the following third-party resources:
+OroPrinter bundles the following third-party resources:
 
 Vue 3
 License: MIT-licensed open source

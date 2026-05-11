@@ -136,7 +136,7 @@ async function createWindow() {
       click: () => app.quit(),
     },
   ]);
-  tray.setToolTip('MotionPrinter');
+  tray.setToolTip('OroPrinter'); // Tooltip for the tray icon
   tray.setContextMenu(contextMenu);
 
   // Handle tray icon click
@@ -389,7 +389,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
     page?.pdfs?.filter(async (card, i) => {
       if (card?.isConverted) return true;
 
-      if (['eshram', 'csc_id'].includes(card?.cardType as string) || (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar')) {
+      if (['eshram', 'csc_id', 'apaar'].includes(card?.cardType as string) || (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar')) {
 
         let execFilePath = path.join(pdf.path, 'pdfimages');
 
@@ -448,7 +448,7 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                 event.reply('cardMaker-image-extracted-failure', { page, card });
               }
               // for APAAR Card processing
-            } else if (card?.cardType == 'abc_apaar' && card.abcTo == 'apaar') {
+            } else if ((card?.cardType == 'abc_apaar' && card.abcTo == 'apaar') || card?.cardType == 'apaar') {
 
               execFile(
                 path.join(pdf.path, 'pdftotext'),
@@ -468,10 +468,18 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                     return;
                   }
 
+                  let isApaar = card?.cardType == 'apaar';
                   let photoPath = path.join(card.path, `${cardName}-020.png`);
                   let qr = path.join(card.path, `${cardName}-021.png`);
                   let textFilePath = path.join(card.path, `${cardName}-text.txt`);
                   let textContent = '';
+
+                  if (isApaar) {
+                    photoPath = path.join(card.path, `${cardName}-023.png`);
+                    qr = path.join(card.path, `${cardName}-024.png`);
+                    textFilePath = path.join(card.path, `${cardName}-text.txt`);
+                    textContent = '';
+                  }
 
                   if (fs.existsSync(textFilePath)) {
                     textContent = fs.readFileSync(textFilePath, 'utf-8');
@@ -486,6 +494,16 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                     abc_id: arr[9].replace(/(.{4})/g, "$1 ").trim(),
                     signed_time: arr[11],
                   }
+
+                  if (isApaar) {
+                    const lines = textContent.split('\n').filter(l => l.trim() !== '');
+                    apaarData.name = lines[5]?.trim() || '';
+                    apaarData.dob = lines[6]?.trim() || '';
+                    apaarData.gender = lines[7]?.trim() || '';
+                    apaarData.abc_id = lines[8]?.trim().replace(/(\d{4})(?=\d)/g, '$1 ') || '';
+                    apaarData.signed_time = lines[10]?.trim() || '';
+                  }
+
                   console.log('Extracted Text:', apaarData);
 
                   // Load base image 
@@ -532,18 +550,20 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
                   event.reply('cardMaker-image-extracted-success', page);
                   console.log('cardMaker-image-extracted-success');
 
+                  await sleep(1000);
+                  range(0, 30).map((el) => {
+                    let filePath = path.join(card.path, `${cardName}-${String(el).padStart(3, '0')}.png`);
+                    if (fs.existsSync(filePath)) {
+                      try {
+                        fs.unlinkSync(filePath);
+                        console.log(`Deleted: ${cardName}-${String(el).padStart(3, '0')}.png`);
+                      } catch (err) { err = !err; }
+                    }
+                  });
+
                 }
               );
 
-              range(0, 20).map((el) => {
-                let filePath = path.join(card.path, `${cardName}-${String(el).padStart(3, '0')}.png`);
-                if (fs.existsSync(filePath)) {
-                  try {
-                    fs.unlinkSync(filePath);
-                    console.log(`Deleted: ${cardName}-${String(el).padStart(3, '0')}.png`);
-                  } catch (err) { err = !err; }
-                }
-              });
 
 
             } else if (card?.cardType == 'csc_id') {

@@ -13,7 +13,7 @@ console.log('[App.vue]', `store lord started`);
 export const useLordStore = defineStore('lord', () => {
   const dbPath = path.join(
     os.homedir(),
-    '/motionprinter/db/',
+    '/oroprinter/db/',
     `lordPrinter-${ip.address()}.json`,
   );
 

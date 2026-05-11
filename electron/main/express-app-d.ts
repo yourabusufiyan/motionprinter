@@ -73,6 +73,7 @@ export type cardMakerPDF = toPrintsCommandsFile & {
   | 'nielit_student_id'
   | 'ration'
   | 'udid'
+  | 'apaar'
   | null;
   provider?: 'uti' | 'nsdl' | null;
   abcTo?: 'abc' | 'apaar' | null;

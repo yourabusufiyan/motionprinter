@@ -1,9 +1,11 @@
 1.1.5
+* Name changed from MotionPrinter to OroPrinter
 * Added👍
   1. OroPDF
     a. PDF to Image
   2. Card Maker
     a. UDID card added
+    b. Apaar card added
 
 1.1.4
 * Added👍

@@ -9,9 +9,9 @@ Toaster(class="pointer-events-auto" :expand="false" richColors)
 AlertDialog(v-model:open="isAlertOpen")
   AlertDialogContent
     AlertDialogHeader
-      AlertDialogTitle New version of MotionPrinter available.
+      AlertDialogTitle New version of OroPrinter available.
       AlertDialogDescription
-        | Get new features to install newest version of MotionPrinter
+        | Get new features to install newest version of OroPrinter
     AlertDialogFooter
       AlertDialogCancel Later
       AlertDialogAction

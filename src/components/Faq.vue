@@ -12,13 +12,13 @@ const accordionItems = [
   {
     title: 'Is it free?',
     content:
-      'Yes, Absolutely! MotionPrinter is provided free of charge for both personal and commercial use, allowing users to benefit from its full functionality without any associated costs, regardless of the intended purpose.',
+      'Yes, Absolutely! OroPrinter is provided free of charge for both personal and commercial use, allowing users to benefit from its full functionality without any associated costs, regardless of the intended purpose.',
   },
   {
     title:
-      'Is installation of MotionPrinter required on all computers for connectivity?',
+      'Is installation of OroPrinter required on all computers for connectivity?',
     content:
-      'Yes, MotionPrinter must be installed on all of your computers to ensure seamless and efficient operation across the network.',
+      'Yes, OroPrinter must be installed on all of your computers to ensure seamless and efficient operation across the network.',
   },
   {
     title: 'Is an internet connection required?',
@@ -26,9 +26,9 @@ const accordionItems = [
       'No, an internet connection is not required. However, all devices must be connected to the same local network to ensure proper functionality and seamless communication between them.',
   },
   {
-    title: 'Does MotionPrinter retain a history of printed files?',
+    title: 'Does OroPrinter retain a history of printed files?',
     content:
-      'Yes, MotionPrinter maintains a history of printed files. You can view this history by selecting the "History" navigation button located in the sidebar of the MotionPrinter interface.',
+      'Yes, OroPrinter maintains a history of printed files. You can view this history by selecting the "History" navigation button located in the sidebar of the OroPrinter interface.',
   },
 ];
 </script>

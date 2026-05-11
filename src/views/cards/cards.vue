@@ -101,7 +101,7 @@ const options = ref(
     { label: 'Pan Card', value: 'pan' },
     { label: 'Voter ID(New/e-EPIC) Card', value: 'voter_new' },
     { label: 'ABC', value: 'abc_apaar' },
-    { label: 'APAAR(Cooming Soon)', value: 'apaar', disabled: true },
+    { label: 'APAAR', value: 'apaar' },
     { label: 'CSC ID Card', value: 'csc_id' },
     { label: 'NIELIT Student ID Card', value: 'nielit_student_id' },
     { label: 'Ration Card', value: 'ration' },

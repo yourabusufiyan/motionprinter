@@ -94,7 +94,7 @@ aside.top-0.left-0.fixed
       h1.text-2xl.font-medium(
         class="dark:text-slate-100"
       )
-        | MotionPrinter
+        | OroPrinter
         span(href="https://en.wikipedia.org/wiki/Palestine" target="_blank")
           span.text-base.align-top(title="We support Palestine!") 🍉
       code.text-xs.block.text-gray-500.m-0.p-0 Beta #[span(class="font-mono dark:text-slate-300") v{{ version }}]

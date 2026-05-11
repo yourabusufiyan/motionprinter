@@ -13,7 +13,7 @@ footer.footer.bg-white.px-5.py-4.border-t( class="dark:bg-gray-950" )
         href="https://motionprinter.pages.dev?ref=motionprinter"
         target="_blank"
         class="hover:underline ml-1"
-      ) MotionPrinter
+      ) OroPrinter
       | . All Rights Reserved.
 
     .flex.mt-4(class="sm:justify-center sm:mt-0")

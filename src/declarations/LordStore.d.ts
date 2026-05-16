@@ -27,6 +27,7 @@ export type lordData = {
   temp: Array<
     cardMaker | toPrintsCommandsFile | Trash | uploadFile | photoSheetPhoto
   >;
+  
 };
 
 export type computerProfile = {

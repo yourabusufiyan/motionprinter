@@ -22,7 +22,8 @@ export type uploadFile = {
   temp?: boolean;
   isPasswordProtected?: boolean;
   password: null
-
+  isPasswordRight?: boolean;
+  thumbnail?: string | null;
 };
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -110,3 +111,10 @@ export type photoSheet = {
   outputFile?: string | null;
   photos: photoSheetPhoto[];
 };
+
+export type oroPdfSettings = {
+  id: string;
+  addedTime: Date | number;
+  dpi?: number | null;
+  files?: uploadFile[];
+}

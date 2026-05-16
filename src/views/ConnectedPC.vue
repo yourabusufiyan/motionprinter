@@ -95,8 +95,15 @@ async function loadComputers(force: boolean = false) {
           AccordionContent(
             class="px-3 py-4 bg-slate-100 dark:bg-slate-700 dark:text-slate-300"
           )
-            p.text-sm.text-stone-800(class="dark:text-stone-300") Computer Name : {{ item?.computerName }}
-            p.text-sm.text-stone-800(class="dark:text-stone-300") Computer IP : {{ item?.ip }}
+            table
+              tbody
+                tr
+                  td.text-sm.text-stone-800(class="dark:text-stone-300") Computer Name : 
+                  td {{ item?.computerName }}
+                tr
+                  td.text-sm.text-stone-800(class="dark:text-stone-300")  Computer IP :
+                  td {{ item?.ip }}
+
             p.text-sm.text-stone-800(v-if="item?.lastPrinted") {{ item?.lastPrinted }}
             hr.my-5.border-slate-800.m-auto(class="w-2/3 dark:border-slate-100")
 

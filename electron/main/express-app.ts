@@ -36,6 +36,7 @@ import axios, { AxiosResponse } from 'axios';
 import fileUpload from 'express-fileupload';
 import { v7 as uuidv7 } from 'uuid';
 import { app, BrowserWindow } from 'electron';
+import listEndpoints from 'express-list-endpoints';
 
 import { localPrinter } from './../../src/declarations/PrintersList';
 import type { Request, Response, NextFunction } from 'express';
@@ -71,6 +72,7 @@ class expressAppClass {
     join(os.homedir(), app.getName(), './upload/'),
     join(os.homedir(), app.getName(), './db/'),
     join(os.homedir(), app.getName(), './temp/'),
+    join(os.homedir(), app.getName(), './oropdf/'),
   ];
 
   static computerName: string | undefined = process.env.COMPUTERNAME;
@@ -242,6 +244,7 @@ class expressAppClass {
   }
 
   static middlewareInit(): void {
+    console.log('Initializing middleware with port : ', expressPort);
     this.app.set('port', expressPort);
     this.app.use((req, res, next) => {
       this.reloadDatabase();
@@ -435,18 +438,10 @@ class expressAppClass {
       res.json(await this?.win?.webContents.getPrintersAsync());
     });
     this.router.get('/printers/default', async (req, res) => {
-      res.json(
-        (await this?.win?.webContents.getPrintersAsync())?.filter(
-          (el) => el.isDefault,
-        )[0],
-      );
+      res.json((await this?.win?.webContents.getPrintersAsync())?.filter((el) => el.isDefault,)[0]);
     });
-    this.router.get('/defaultData', async (req: any, res: any) =>
-      res.json(this.defaultLordData()),
-    );
-    this.router.get('/data', async (req: any, res: any) =>
-      res.json(this.db.data),
-    );
+    this.router.get('/defaultData', async (req: any, res: any) => res.json(this.defaultLordData()),);
+    this.router.get('/data', async (req: any, res: any) => res.json(this.db.data),);
     this.router.post('/savedata', async (req: any, res: any) => {
       console.log('save data', last(req.body?.data?.cardMaker));
       if (req.body?.data) {
@@ -518,8 +513,12 @@ class expressAppClass {
     });
 
     // OroPDF
-    this.router.post('/upload-pdf', this.uploadPDFWithPassword.bind(this));
-    this.router.post('/verify-pdf-password', this.verifyPDFPassword.bind(this));
+    this.router.post('/upload-pdf', this.uploadPDFOnly.bind(this));
+    this.router.get('/upload-pdf', (req, res) => res.json({ message: 'Please use POST method to upload PDF' }));
+    this.router.post('/generate-thumbnail', this.generateThumbnail);
+
+    const routerRoutes = listEndpoints(this.app);
+    console.table(routerRoutes);
   }
 
   static async uploadMethod(req: Request, res: Response, next: NextFunction) {
@@ -809,173 +808,203 @@ class expressAppClass {
   }
 
   // OroPDF
-static async uploadPDFWithPassword(req: Request, res: Response) {
-  try {
-    const { password, temp, addedBy, addedTo, printOptions } = req.body;
-    
-    if (!req.files || !req.files.pdfFile) {
+  /**
+ * Step 1: Upload PDF only and return file info
+ */
+  static async uploadPDFOnly(req: Request, res: Response) {
+    console.log('Step 1: Uploading PDF only');
+
+    if (!req.files || !req.files.sampleFile) {
       return res.status(400).json({ error: 'No PDF file uploaded' });
     }
 
-    const pdfFile = req.files.pdfFile as UploadedFile;
-    const newFileName = uuidv7() + '.pdf';
-    const uploadPath = temp === 'true' 
-      ? join(this.dir[3], newFileName)
-      : join(this.dir[1], newFileName);
+    const sampleFile = req.files.sampleFile as UploadedFile;
 
-    // Save file temporarily
-    await pdfFile.mv(uploadPath);
+    // Validate file extension
+    const validExtensions = ['.pdf'];
+    const fileExt = extname(sampleFile.name).toLowerCase();
 
-    // Check if PDF is password protected and verify password
-    const pdfInfo = await this.checkPDFProtection(uploadPath, password);
-
-    if (pdfInfo.isProtected && !pdfInfo.passwordVerified) {
-      // Delete the temporary file since password is wrong
-      fs.unlinkSync(uploadPath);
-      return res.status(401).json({ 
-        error: 'PDF is password protected and password is incorrect',
-        requiresPassword: true,
-        filename: pdfFile.name
+    if (!validExtensions.includes(fileExt)) {
+      return res.status(400).json({
+        error: 'Invalid file type. Only PDF files are allowed.'
       });
     }
 
-    // Create file record
-    const fileData: uploadFile = {
-      originalName: pdfFile.name,
-      encoding: pdfFile.encoding,
-      mimetype: pdfFile.mimetype,
-      destination: uploadPath,
-      filename: newFileName,
-      path: temp === 'true' ? this.dir[3] : this.dir[1],
-      size: pdfFile.size,
-      temp: temp === 'true',
-      isPasswordProtected: pdfInfo.isProtected,
-      password: password || null
-    };
+    // Generate unique filename
+    const newFileName = `${uuidv7()}${fileExt}`;
+    const uploadPath = join(this.dir[3], newFileName); // Store in temp directory
 
-    const commandFile: toPrintsCommandsFile = {
-      ...fileData,
-      uploaded: true,
-      addedTime: Date.now(),
-      isPrinted: false,
-      addedBy: addedBy || null,
-      addedTo: addedTo || null,
-      printOptions: printOptions ? JSON.parse(printOptions) : null,
-    };
-
-    // Store in appropriate database
-    if (temp === 'true') {
-      this.db.data.temp.push(commandFile);
-    } else {
-      this.db.data.toPrintsCommands.push(commandFile);
-    }
-
-    this.db.write();
-    this.win?.webContents.send('reloadDatabase');
-
-    res.json({
-      success: true,
-      file: commandFile,
-      pdfInfo: {
-        isProtected: pdfInfo.isProtected,
-        numPages: pdfInfo.numPages
+    // Move file to temp directory
+    sampleFile.mv(uploadPath, async (err) => {
+      if (err) {
+        console.error('Error saving file:', err);
+        return res.status(500).json({ error: 'Failed to save file' });
       }
-    });
 
-  } catch (error) {
-    console.error('Error uploading PDF:', error);
-    res.status(500).json({ error: 'Failed to upload PDF' });
-  }
-}
+      // Check if PDF is password protected
+      let isPasswordProtected = false;
+      let pageCount = 0;
 
-// Method to check PDF protection and verify password
-static async checkPDFProtection(filePath: string, password?: string): Promise<{
-  isProtected: boolean;
-  passwordVerified: boolean;
-  numPages?: number;
-}> {
-  try {
-    // Use pdf-parse or similar library to check PDF
-    const pdfParse = require('pdf-parse');
-    
-    let dataBuffer = fs.readFileSync(filePath);
-    
-    try {
-      // Try to parse without password first
-      const data = await pdfParse(dataBuffer);
-      return {
-        isProtected: false,
-        passwordVerified: true,
-        numPages: data.numpages
+
+      // Create file record
+      const fileRecord = {
+        id: uuidv7(),
+        filename: newFileName,
+        originalName: sampleFile.name,
+        path: uploadPath,
+        size: sampleFile.size,
+        uploadedAt: Date.now(),
+        isPasswordProtected: isPasswordProtected,
+        pageCount: pageCount,
+        thumbnailGenerated: false,
+        thumbnailPath: null
       };
-    } catch (error: any) {
-      // If error indicates password protection
-      if (error.message && error.message.includes('password')) {
-        if (password) {
-          // Try with password
-          try {
-            const data = await pdfParse(dataBuffer, { password });
-            return {
-              isProtected: true,
-              passwordVerified: true,
-              numPages: data.numpages
-            };
-          } catch (passwordError) {
-            return {
-              isProtected: true,
-              passwordVerified: false
-            };
-          }
-        }
-        return {
-          isProtected: true,
-          passwordVerified: false
-        };
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error checking PDF protection:', error);
-    return {
-      isProtected: false,
-      passwordVerified: false
-    };
-  }
-}
 
-static async verifyPDFPassword(req: Request, res: Response) {
-  const { filename, password } = req.body;
-  
-  try {
-    const file = find(this.db.data.toPrintsCommands, ['filename', filename]);
-    
-    if (!file) {
+
+      // Return response with file info (no thumbnail yet)
+      res.json({
+        success: true,
+        step: 'uploaded',
+        fileInfo: {
+          id: fileRecord.id,
+          filename: fileRecord.filename,
+          originalName: fileRecord.originalName,
+          size: fileRecord.size,
+          isPasswordProtected: fileRecord.isPasswordProtected,
+          pageCount: fileRecord.pageCount,
+          requiresPassword: fileRecord.isPasswordProtected
+        }
+      });
+    });
+  }
+
+  /**
+   * Step 2: Generate thumbnail from previously uploaded PDF
+   */
+  static async generateThumbnail(req: Request, res: Response) {
+    console.log('Step 2: Generating thumbnail');
+
+    const { fileId, password, pageNumber = 1 } = req.body;
+
+    if (!fileId) {
+      return res.status(400).json({ error: 'File ID is required' });
+    }
+
+    // Find the file in database
+    const fileRecord = expressAppClass.db.data.tempUploads?.find(
+      (f: any) => f.id === fileId
+    );
+
+    if (!fileRecord) {
       return res.status(404).json({ error: 'File not found' });
     }
-    
-    const pdfInfo = await this.checkPDFProtection(file.destination, password);
-    
-    if (pdfInfo.passwordVerified) {
-      // Update file with correct password
-      file.password = password;
-      this.db.write();
-      
-      res.json({ 
-        verified: true, 
-        message: 'Password verified successfully',
-        numPages: pdfInfo.numPages
+
+    const filePath = fileRecord.path;
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File does not exist on disk' });
+    }
+
+    // Generate thumbnail filename
+    const thumbnailFilename = `${fileRecord.filename}_thumb_page${pageNumber}.png`;
+    const thumbnailPath = join(this.dir[3], thumbnailFilename);
+
+    try {
+      // Build pdftoppm command for single page thumbnail
+      let cmd = `"${path.join(POPPLER_PATH, 'pdftoppm.exe')}"`;
+      cmd += ` -png`;                           // PNG format
+      cmd += ` -f ${pageNumber}`;               // First page
+      cmd += ` -l ${pageNumber}`;               // Last page (same as first)
+      cmd += ` -scale-to 300`;                  // Scale to 300px width
+      cmd += ` -singlefile`;                    // Single file output
+
+      // Add password if provided
+      if (password) {
+        cmd += ` -upw "${password}"`;
+      }
+
+      // Remove extension from output path (pdftoppm adds it automatically)
+      const outputBase = thumbnailPath.replace('.png', '');
+      cmd += ` "${filePath}" "${outputBase}"`;
+
+      console.log('Executing command:', cmd);
+
+      const { stdout, stderr } = await execPromise(cmd);
+
+      if (stderr && !stderr.includes('Syntax Warning')) {
+        // Check if it's a password error
+        if (stderr.toLowerCase().includes('password')) {
+          return res.status(401).json({
+            error: 'PDF is password protected',
+            requiresPassword: true,
+            fileId: fileRecord.id
+          });
+        }
+        console.warn('Thumbnail generation warning:', stderr);
+      }
+
+      // Check if thumbnail was created
+      let actualThumbnailPath = thumbnailPath;
+      if (!fs.existsSync(thumbnailPath)) {
+        // Try to find the actual generated file (might have different naming)
+        const files = fs.readdirSync(this.dir[3]);
+        const generatedFile = files.find(f =>
+          f.startsWith(fileRecord.filename) && f.endsWith('.png')
+        );
+
+        if (generatedFile) {
+          actualThumbnailPath = join(this.dir[3], generatedFile);
+        } else {
+          throw new Error('Thumbnail file was not generated');
+        }
+      }
+
+      // Update file record
+      fileRecord.thumbnailGenerated = true;
+      fileRecord.thumbnailPath = actualThumbnailPath;
+      fileRecord.thumbnailUrl = `/temp/${path.basename(actualThumbnailPath)}`;
+      expressAppClass.db.write();
+
+      // Read thumbnail as base64 for immediate display
+      const thumbnailBuffer = fs.readFileSync(actualThumbnailPath);
+      const thumbnailBase64 = thumbnailBuffer.toString('base64');
+
+      // Return thumbnail data
+      res.json({
+        success: true,
+        step: 'thumbnail_generated',
+        thumbnail: {
+          url: fileRecord.thumbnailUrl,
+          base64: `data:image/png;base64,${thumbnailBase64}`,
+          filename: path.basename(actualThumbnailPath),
+          size: fs.statSync(actualThumbnailPath).size
+        },
+        fileInfo: {
+          id: fileRecord.id,
+          filename: fileRecord.filename,
+          originalName: fileRecord.originalName,
+          pageCount: fileRecord.pageCount,
+          isPasswordProtected: fileRecord.isPasswordProtected
+        }
       });
-    } else {
-      res.status(401).json({ 
-        verified: false, 
-        error: 'Incorrect password' 
+
+    } catch (error: any) {
+      console.error('Thumbnail generation error:', error);
+
+      if (error.message && error.message.toLowerCase().includes('password')) {
+        return res.status(401).json({
+          error: 'Invalid password or PDF is password protected',
+          requiresPassword: true,
+          fileId: fileRecord.id
+        });
+      }
+
+      res.status(500).json({
+        error: 'Failed to generate thumbnail',
+        details: error.message
       });
     }
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to verify password' });
   }
-}
-
 
 }
 

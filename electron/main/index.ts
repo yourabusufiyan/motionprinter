@@ -75,7 +75,9 @@ const dir = [
   path.join(os.homedir(), app.getName(), '/upload/pdf/'),
   path.join(os.homedir(), app.getName(), '/upload/image/'),
   path.join(os.homedir(), app.getName(), '/db/'),
+  path.join(os.homedir(), app.getName(), '/oropdf/'),
 ];
+
 
 dir.map((el) => !fs.existsSync(el) && fs.mkdirSync(el, { recursive: true }));
 

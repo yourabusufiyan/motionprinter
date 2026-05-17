@@ -50,6 +50,7 @@ import type {
   toPrintsCommandsFile,
   cardMaker,
   cardMakerPDF,
+  oroPdfSettings,
 } from './express-app-d';
 import type { Printer, PrintOptions } from 'pdf-to-printer';
 import type { UploadedFile } from 'express-fileupload';
@@ -59,10 +60,12 @@ import { ip_to_sequence, sleep } from '../../helpers/both';
 import { getAssetPath } from './../helpers/cardmakers';
 
 import dayjs from 'dayjs';
+import { checkProtected, pdf2image as oroPdf2Image, verifyPassword } from './oro-pdf';
 
 class expressAppClass {
   static app = express();
   static router = express.Router();
+  static oroPDF = express.Router();
   static port = 9457;
   static server: any = '';
   static isServerRunning = false;
@@ -127,6 +130,7 @@ class expressAppClass {
       offlineComputers: [],
       cardMaker: [],
       temp: [],
+      oropdf: []
     };
   }
 
@@ -259,6 +263,7 @@ class expressAppClass {
     this.app.use('/upload/', express.static(this.dir[1]));
     this.app.use('/temp/', express.static(this.dir[3]));
     this.app.use('/api/v1/', this.router);
+    this.app.use('/api/v1/oropdf/', this.oroPDF);
     this.app.use((_req: any, _res: any, next: any) => next(createError(404)));
     this.app.use((err: any, req: any, res: any, _next: any) => {
       res.locals.title = 'error';
@@ -513,9 +518,10 @@ class expressAppClass {
     });
 
     // OroPDF
-    this.router.post('/upload-pdf', this.uploadPDFOnly.bind(this));
-    this.router.get('/upload-pdf', (req, res) => res.json({ message: 'Please use POST method to upload PDF' }));
-    this.router.post('/generate-thumbnail', this.generateThumbnail);
+    this.oroPDF.post('/create-oro', this.createOroPDF.bind(this));
+    this.oroPDF.post('/upload-pdf', this.uploadPDFOnly.bind(this));
+    this.oroPDF.post('/verify-password', this.verifyPassword.bind(this));
+    this.oroPDF.post('/generate-thumbnail', this.generateThumbnail.bind(this));
 
     const routerRoutes = listEndpoints(this.app);
     console.table(routerRoutes);
@@ -808,9 +814,23 @@ class expressAppClass {
   }
 
   // OroPDF
+  static async createOroPDF(req: Request, res: Response) {
+    const o: oroPdfSettings = {
+      id: uuidv7(),
+      addedTime: (new Date()).getTime(),
+      dpi: 300,
+      files: []
+    };
+    this.db.data.oropdf.push(o);
+    this.db.write();
+    this.win?.webContents.send('reloadDatabase');
+    res.json(o);
+    return o;
+  }
+
   /**
- * Step 1: Upload PDF only and return file info
- */
+  * Step 1: Upload PDF only and return file info
+  */
   static async uploadPDFOnly(req: Request, res: Response) {
     console.log('Step 1: Uploading PDF only');
 
@@ -819,6 +839,7 @@ class expressAppClass {
     }
 
     const sampleFile = req.files.sampleFile as UploadedFile;
+    const oropdfId = req.body.oropdfId;
 
     // Validate file extension
     const validExtensions = ['.pdf'];
@@ -832,9 +853,9 @@ class expressAppClass {
 
     // Generate unique filename
     const newFileName = `${uuidv7()}${fileExt}`;
-    const uploadPath = join(this.dir[3], newFileName); // Store in temp directory
+    const uploadPath = join(this.dir[4], newFileName); // Store in oropdf directory
 
-    // Move file to temp directory
+    // Move file to oropdf directory
     sampleFile.mv(uploadPath, async (err) => {
       if (err) {
         console.error('Error saving file:', err);
@@ -845,165 +866,74 @@ class expressAppClass {
       let isPasswordProtected = false;
       let pageCount = 0;
 
-
       // Create file record
       const fileRecord = {
         id: uuidv7(),
         filename: newFileName,
         originalName: sampleFile.name,
-        path: uploadPath,
+        destination: uploadPath,
         size: sampleFile.size,
         uploadedAt: Date.now(),
-        isPasswordProtected: isPasswordProtected,
+        isPasswordProtected: await checkProtected(uploadPath),
         pageCount: pageCount,
         thumbnailGenerated: false,
         thumbnailPath: null
-      };
 
+      };
 
       // Return response with file info (no thumbnail yet)
       res.json({
         success: true,
         step: 'uploaded',
-        fileInfo: {
-          id: fileRecord.id,
-          filename: fileRecord.filename,
-          originalName: fileRecord.originalName,
-          size: fileRecord.size,
-          isPasswordProtected: fileRecord.isPasswordProtected,
-          pageCount: fileRecord.pageCount,
-          requiresPassword: fileRecord.isPasswordProtected
-        }
+        fileInfo: fileRecord
       });
+
+      const oropdf = this.db.data.oropdf?.find(el => el.id === oropdfId)
+      if (oropdf) {
+        console.log('Found oropdf record, adding file to it');
+        oropdf.files = [...oropdf.files, ...[fileRecord]];
+        this.db.write();
+        this.win?.webContents.send('reloadDatabase');
+      }
+
+
     });
   }
 
+  static async verifyPassword(req: Request, res: Response) {
+    await verifyPassword(req.body.path, req.body.password).then((isValid) => {
+      res.json({ isValid });
+    })
+  }
   /**
    * Step 2: Generate thumbnail from previously uploaded PDF
    */
   static async generateThumbnail(req: Request, res: Response) {
     console.log('Step 2: Generating thumbnail');
-
-    const { fileId, password, pageNumber = 1 } = req.body;
-
-    if (!fileId) {
-      return res.status(400).json({ error: 'File ID is required' });
+    const file = req.body as uploadFile;
+    console.log('Received file info for thumbnail generation:', file, req.body);
+    if (!file.id) {
+      return res.status(400).json({ error: 'fileId is required' });
     }
-
-    // Find the file in database
-    const fileRecord = expressAppClass.db.data.tempUploads?.find(
-      (f: any) => f.id === fileId
-    );
-
-    if (!fileRecord) {
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    const filePath = fileRecord.path;
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File does not exist on disk' });
-    }
-
-    // Generate thumbnail filename
-    const thumbnailFilename = `${fileRecord.filename}_thumb_page${pageNumber}.png`;
-    const thumbnailPath = join(this.dir[3], thumbnailFilename);
-
-    try {
-      // Build pdftoppm command for single page thumbnail
-      let cmd = `"${path.join(POPPLER_PATH, 'pdftoppm.exe')}"`;
-      cmd += ` -png`;                           // PNG format
-      cmd += ` -f ${pageNumber}`;               // First page
-      cmd += ` -l ${pageNumber}`;               // Last page (same as first)
-      cmd += ` -scale-to 300`;                  // Scale to 300px width
-      cmd += ` -singlefile`;                    // Single file output
-
-      // Add password if provided
-      if (password) {
-        cmd += ` -upw "${password}"`;
-      }
-
-      // Remove extension from output path (pdftoppm adds it automatically)
-      const outputBase = thumbnailPath.replace('.png', '');
-      cmd += ` "${filePath}" "${outputBase}"`;
-
-      console.log('Executing command:', cmd);
-
-      const { stdout, stderr } = await execPromise(cmd);
-
-      if (stderr && !stderr.includes('Syntax Warning')) {
-        // Check if it's a password error
-        if (stderr.toLowerCase().includes('password')) {
-          return res.status(401).json({
-            error: 'PDF is password protected',
-            requiresPassword: true,
-            fileId: fileRecord.id
-          });
-        }
-        console.warn('Thumbnail generation warning:', stderr);
-      }
-
-      // Check if thumbnail was created
-      let actualThumbnailPath = thumbnailPath;
-      if (!fs.existsSync(thumbnailPath)) {
-        // Try to find the actual generated file (might have different naming)
-        const files = fs.readdirSync(this.dir[3]);
-        const generatedFile = files.find(f =>
-          f.startsWith(fileRecord.filename) && f.endsWith('.png')
-        );
-
-        if (generatedFile) {
-          actualThumbnailPath = join(this.dir[3], generatedFile);
-        } else {
-          throw new Error('Thumbnail file was not generated');
+    
+    await oroPdf2Image(file).then((file) => {
+      // Update file record with thumbnail info
+      console.log('Thumbnail generated at:', file);
+      const oropdf = this.db.data.oropdf?.find(el => el.files?.find((f) => f.id === file.id)?.id === file.id)
+      if (oropdf) {
+        let targetFile = oropdf.files?.find((f) => f.id === file.id);
+        if (targetFile) {
+          targetFile = { ...targetFile, ...file };
+          this.db.write();
+          this.win?.webContents.send('reloadDatabase');
         }
       }
 
-      // Update file record
-      fileRecord.thumbnailGenerated = true;
-      fileRecord.thumbnailPath = actualThumbnailPath;
-      fileRecord.thumbnailUrl = `/temp/${path.basename(actualThumbnailPath)}`;
-      expressAppClass.db.write();
+    }).catch(() => {
+      res.status(500).json({ error: 'Failed to generate thumbnail' });
+    });
 
-      // Read thumbnail as base64 for immediate display
-      const thumbnailBuffer = fs.readFileSync(actualThumbnailPath);
-      const thumbnailBase64 = thumbnailBuffer.toString('base64');
 
-      // Return thumbnail data
-      res.json({
-        success: true,
-        step: 'thumbnail_generated',
-        thumbnail: {
-          url: fileRecord.thumbnailUrl,
-          base64: `data:image/png;base64,${thumbnailBase64}`,
-          filename: path.basename(actualThumbnailPath),
-          size: fs.statSync(actualThumbnailPath).size
-        },
-        fileInfo: {
-          id: fileRecord.id,
-          filename: fileRecord.filename,
-          originalName: fileRecord.originalName,
-          pageCount: fileRecord.pageCount,
-          isPasswordProtected: fileRecord.isPasswordProtected
-        }
-      });
-
-    } catch (error: any) {
-      console.error('Thumbnail generation error:', error);
-
-      if (error.message && error.message.toLowerCase().includes('password')) {
-        return res.status(401).json({
-          error: 'Invalid password or PDF is password protected',
-          requiresPassword: true,
-          fileId: fileRecord.id
-        });
-      }
-
-      res.status(500).json({
-        error: 'Failed to generate thumbnail',
-        details: error.message
-      });
-    }
   }
 
 }

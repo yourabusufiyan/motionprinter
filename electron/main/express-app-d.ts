@@ -21,7 +21,7 @@ export type uploadFile = {
   size: number;
   temp?: boolean;
   isPasswordProtected?: boolean;
-  password: null
+  password: string | null;
   isPasswordRight?: boolean;
   thumbnail?: string | null;
 };
@@ -116,5 +116,5 @@ export type oroPdfSettings = {
   id: string;
   addedTime: Date | number;
   dpi?: number | null;
-  files?: uploadFile[];
+  files: uploadFile[] | [];
 }

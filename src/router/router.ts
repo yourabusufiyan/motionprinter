@@ -40,9 +40,25 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/OroPDFPage.vue'),
   },
   {
-    path: '/oropdf/pdf-to-jpg',
-    name: 'pdf-to-jpg',
-    component: () => import('../views/oropdf/PDFToJPGConverterPage.vue'),
+    path: '/loading',
+    name: 'OroLoading',
+    component: () => import('../views/oropdf/LoadingPage.vue'),
+    meta: {
+      preventBack: true,
+      preventClose: true
+    }
+  },
+  {
+    path: '/oropdf/download',
+    name: 'OroDownload',
+    component: () => import('../views/oropdf/DownloadPage.vue'),
+  },
+  {
+    path: '/oropdf/pdf-to-image',
+    name: 'pdf-to-image',
+    component: () => import('../views/oropdf/PDFToImage.vue'),
+    meta: { title: 'PDF to Image' },
+
   },
   {
     path: '/connected-pc',

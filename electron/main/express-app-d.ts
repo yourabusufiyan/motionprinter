@@ -24,6 +24,9 @@ export type uploadFile = {
   password: string | null;
   isPasswordRight?: boolean;
   thumbnail?: string | null;
+  out_dir?: string | null;
+  out_prefix?: string | null;
+  dpi?: number | null;
 };
 
 export type toPrintsCommandsFile = uploadFile & {
@@ -116,5 +119,14 @@ export type oroPdfSettings = {
   id: string;
   addedTime: Date | number;
   dpi?: number | null;
+  options?: {
+    format?: string;
+    scale?: number;
+    out_dir?: string;
+    out_prefix?: string;
+    size?: number | null;
+  }
   files: uploadFile[] | [];
+  service?: 'pdf-to-image' | 'pdf-to-png' | 'pdf-to-jpg';
+
 }

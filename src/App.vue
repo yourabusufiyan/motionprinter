@@ -2,8 +2,8 @@
 Toaster(class="pointer-events-auto" :expand="false" richColors)
 .app
   Sidebar
-  .ml-64.min-h-screen.flex.flex-col
-    main.bg-white(class="dark:bg-slate-950")
+  .ml-64.flex.flex-col
+    main.bg-white.min-h-screen(class="dark:bg-slate-950")
       <router-view/>
 
 AlertDialog(v-model:open="isAlertOpen")

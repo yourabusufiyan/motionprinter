@@ -98,9 +98,7 @@ aside.top-0.left-0.fixed
         span(href="https://en.wikipedia.org/wiki/Palestine" target="_blank")
           span.text-base.align-top(title="We support Palestine!") 🍉
       code.text-xs.block.text-gray-500.m-0.p-0 Beta #[span(class="font-mono dark:text-slate-300") v{{ version }}]
-      p.text-sm.text-slate-600.leading-tight.mt-1(
-        class="dark:text-slate-300"
-      ) Printer sharing application to others devices.
+      
       hr.mt-3.border-slate-200(
         class="sm:mx-auto dark:border-slate-700 xl:my-8"
       )

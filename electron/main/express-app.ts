@@ -60,7 +60,9 @@ import { ip_to_sequence, sleep } from '../../helpers/both';
 import { getAssetPath } from './../helpers/cardmakers';
 
 import dayjs from 'dayjs';
-import { checkProtected, pdf2image as oroPdf2Image, verifyPassword } from './oro-pdf';
+import { checkProtected, pdf2image as oroPdf2Image, verifyPassword, createFolder, compressFolderToZip } from './oro-pdf';
+import { c } from 'vite/dist/node/moduleRunnerTransport.d-DJ_mE5sf';
+import sanitize from 'sanitize-filename'
 
 class expressAppClass {
   static app = express();
@@ -261,6 +263,7 @@ class expressAppClass {
     this.app.use(fileUpload());
     this.app.use('/public/', express.static(this.dir[0]));
     this.app.use('/upload/', express.static(this.dir[1]));
+    this.app.use('/oropdf/', express.static(this.dir[4]));
     this.app.use('/temp/', express.static(this.dir[3]));
     this.app.use('/api/v1/', this.router);
     this.app.use('/api/v1/oropdf/', this.oroPDF);
@@ -522,6 +525,7 @@ class expressAppClass {
     this.oroPDF.post('/upload-pdf', this.uploadPDFOnly.bind(this));
     this.oroPDF.post('/verify-password', this.verifyPassword.bind(this));
     this.oroPDF.post('/generate-thumbnail', this.generateThumbnail.bind(this));
+    this.oroPDF.post('/oro-loading', this.oroLoading.bind(this));
 
     const routerRoutes = listEndpoints(this.app);
     console.table(routerRoutes);
@@ -815,11 +819,15 @@ class expressAppClass {
 
   // OroPDF
   static async createOroPDF(req: Request, res: Response) {
+
+    const options = req.body?.options;
+
     const o: oroPdfSettings = {
       id: uuidv7(),
       addedTime: (new Date()).getTime(),
       dpi: 300,
-      files: []
+      files: [],
+      options
     };
     this.db.data.oropdf.push(o);
     this.db.write();
@@ -915,7 +923,7 @@ class expressAppClass {
     if (!file.id) {
       return res.status(400).json({ error: 'fileId is required' });
     }
-    
+
     await oroPdf2Image(file).then((file) => {
       // Update file record with thumbnail info
       console.log('Thumbnail generated at:', file);
@@ -932,6 +940,65 @@ class expressAppClass {
     }).catch(() => {
       res.status(500).json({ error: 'Failed to generate thumbnail' });
     });
+
+
+  }
+  static async oroLoading(req: Request, res: Response) {
+    console.log('Step 3: Processing OROPDF');
+
+    const id = req.body.id as string;
+    const oropdf = this.db.data.oropdf?.find(el => el.id === id);
+
+    console.log('Received OROPDF info for processing:', oropdf, req.body);
+
+    if (!oropdf?.id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+    const oroFolder = await createFolder(join(this.dir[4], id));
+    const oroProgressStep = 1 / oropdf.files.length * 80;
+
+    oropdf.options = oropdf.options || {};
+    oropdf.options.out_dir = oroFolder;
+
+    this.win?.webContents.send('oroLoading', { id, message: 'Processing PDF', progress: 10 });
+
+    for (const [index, file] of (oropdf.files || []).entries()) {
+
+      file.dpi = oropdf.dpi || file?.dpi || 300; // Update DPI if provided in options
+      file.out_dir = oroFolder;
+      file.out_prefix = `${path.parse(sanitize(file.originalName as string)).name}-${+index + 1}`;
+
+      await oroPdf2Image(file).then((file) => {
+
+        // Update file record with thumbnail info
+        console.log('processed files:', file);
+        oropdf.files[index] = { ...oropdf.files[index], ...file };
+        this.db.write();
+
+      }).catch(() => {
+        res.status(500).json({ error: 'Failed to generate thumbnail' });
+      }).finally(() => {
+        this.win?.webContents.send('oroLoading', { id, message: `Processing PDF ${index + 1} of ${oropdf.files?.length}`, progress: Math.round((index + 1) * oroProgressStep) });
+      });
+
+    }
+
+    this.win?.webContents.send('oroLoading', { id, message: 'Compressing PDF', progress: 90 });
+
+    try {
+      await compressFolderToZip(oroFolder, oroFolder)
+      console.log('OROPDF processing completed and zipped successfully');
+      if (oropdf?.options) {
+        oropdf.options.size = await require('fs').promises.stat(oroFolder + '.zip').then((s: any) => s.size).catch((err: any) => !err);
+      }
+      oropdf.files = merge(oropdf.files);
+      this.db.write();
+      this.win?.webContents.send('reloadDatabase');
+      this.win?.webContents.send('oroLoading', { id, message: 'Successfully processed OroPDF', progress: 100 });
+      res.json({ success: true, message: 'OROPDF processed and zipped successfully', downloadLink: oroFolder + '.zip' });
+    } catch (error) {
+      console.log('error to compressing the FOlder to zip', oropdf.id)
+    }
 
 
   }

@@ -1,10 +1,10 @@
-import { merge } from "lodash";
+import { merge, zip } from "lodash";
 import path from "path";
 // @ts-ignore
 import pdf from 'pdf-poppler';
 import fs from 'fs';
 import { isEncrypted, decryptPDF } from '@pdfsmaller/pdf-decrypt';
-
+import AdmZip from 'adm-zip';
 
 export async function pdf2image(file: any): Promise<any> {
   return new Promise(async (resolve, reject) => {
@@ -19,8 +19,8 @@ export async function pdf2image(file: any): Promise<any> {
     let opts: any = {
       format: 'png',
       scale: 0,
-      out_dir: path.dirname(file.destination),
-      out_prefix: out_prefix,
+      out_dir: file?.out_dir || path.dirname(file.destination),
+      out_prefix: file?.out_prefix || out_prefix,
       page: null,
       args: {}
     };
@@ -88,5 +88,65 @@ export async function verifyPassword(file: string, password: string): Promise<bo
   })
 }
 
-export async function pdfToJPG(file: string): Promise<void> {
+
+/**
+ * Creates a folder, appending a number if it already exists
+ * @param {string} folderPath - The desired folder path
+ * @returns {Promise<string>} - The actual created folder path
+ */
+export async function createFolder(folderPath: string): Promise<string> {
+  return new Promise(async (resolve, reject) => {
+    try {
+
+      // Check if folder exists
+      if (!fs.existsSync(folderPath)) {
+        // Create folder if it doesn't exist
+        fs.mkdirSync(folderPath, { recursive: true });
+        resolve(folderPath);
+        return;
+      }
+
+      // If folder exists, find available name with number
+      let counter = 1;
+      let newPath = folderPath;
+
+      while (fs.existsSync(newPath)) {
+        const extension = path.extname(folderPath);
+        const baseName = folderPath.replace(extension, '');
+        newPath = `${baseName}-(${counter})${extension}`;
+        counter++;
+      }
+
+      fs.mkdirSync(newPath, { recursive: true });
+      resolve(newPath);
+    } catch (error) {
+      reject(new Error(`Failed to create folder: ${error}`));
+    }
+  });
+}
+
+
+/**
+ * Compress a folder to zip file
+ * @param {string} sourceDir - Source folder path to compress
+ * @param {string} outputPath - Output zip file path
+ * @returns {Promise<string>} - Path to created zip file
+ */
+export async function compressFolderToZip(sourceDir: string, outputPath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    try {
+      const zip = new AdmZip();
+
+      // Add entire folder recursively
+      zip.addLocalFolder(sourceDir);
+
+      // Write zip file
+      zip.writeZip(outputPath + '.zip');
+
+      console.log(`Folder compressed to: ${outputPath}`);
+      resolve(outputPath);
+    } catch (error) {
+      reject(new Error(`Failed to compress folder: ${error}`));
+    }
+  });
 }

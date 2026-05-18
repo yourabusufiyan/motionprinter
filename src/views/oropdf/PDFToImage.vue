@@ -7,6 +7,11 @@ import axios from 'axios'
 import { useLordStore } from '@/stores/LordStore'
 import type { oroPdfSettings, uploadFile } from '../../../electron/main/express-app-d'
 import { isObject, merge } from 'lodash'
+import { useRouter } from 'vue-router'
+
+
+const router = useRouter()
+const route = useRoute()
 
 const pageId = ref<string>('')
 const creatingPageId = ref(false)
@@ -25,6 +30,7 @@ const protectedFiles = ref<Map<string, string>>(new Map())
 const currentPasswordFile = ref<any>(null)
 const passwordInput = ref('')
 const verifyingPassword = ref(false)
+
 
 const qualityOptions = {
   good: { label: 'Good', dpi: 150 },
@@ -64,7 +70,11 @@ function saveToMain() {
 const createPageId = async () => {
   creatingPageId.value = true
   try {
-    const response = await axios.post(`http://${lordStore.db.ip}:9457/api/v1/oropdf/create-oro`)
+    const response = await axios.post(`http://${lordStore.db.ip}:9457/api/v1/oropdf/create-oro`, {
+      options: {
+        format: route.query.format || 'jpg',
+      }
+    })
     if (response.data && response.data.id) {
       pageData.value = response.data
       pageId.value = response.data.id
@@ -190,12 +200,12 @@ const uploadFile = async (file: File) => {
       error.value = 'Upload failed: Invalid response from server'
     }
 
-    saveToMain();
   } catch (err: any) {
     console.error('Upload error:', err)
     error.value = err.response?.data?.error || 'Failed to upload file'
   } finally {
     uploading.value = false
+    saveToMain();
   }
 }
 
@@ -255,7 +265,7 @@ const generateThumbnailFrontend = async (file: any): Promise<any | null> => {
     const page = await pdf.getPage(1)
 
     // Set up canvas
-    const scale = 1.5
+    const scale = 1.1
     const viewport = page.getViewport({ scale })
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
@@ -338,6 +348,10 @@ const handleConvert = async () => {
     })
     // TODO: Send conversion request to backend
     console.log('Final pageData being sent for conversion:', pageData.value)
+    router.push({
+      name: 'OroLoading',
+      query: { id: pageData.value.id }
+    })
   }
 }
 
@@ -469,8 +483,6 @@ onMounted(() => {
             )
               Plus(class="w-8 h-8 text-gray-400")
             p.text-xs.text-gray-700.text-center.truncate.w-20 ADD FILE
-      pre {{ pageData }}
-      pre {{ toDisplay }}
 
       div(v-if="error")
         p.text-lg.font-medium.text-red-600 Error

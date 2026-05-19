@@ -10,6 +10,27 @@ export type MutlerFileResponse = {
   size: number;
 };
 
+export interface PdfInfo {
+  creator: string;
+  producer: string;
+  creationdate: string;
+  moddate: string;
+  tagged: 'yes' | 'no';
+  userproperties: 'yes' | 'no';
+  suspects: 'yes' | 'no';
+  form: 'AcroForm' | 'XFA' | 'none';
+  javascript: 'yes' | 'no';
+  pages: string;
+  encrypted: 'yes' | 'no';
+  page_size: string;
+  page_rot: string;
+  file_size: string;
+  optimized: 'yes' | 'no';
+  pdf_version: string;
+  width_in_pts: number;
+  height_in_pts: number;
+}
+
 export type uploadFile = {
   id?: string;
   originalName?: string;
@@ -27,6 +48,7 @@ export type uploadFile = {
   out_dir?: string | null;
   out_prefix?: string | null;
   dpi?: number | null;
+  info?: PdfInfo | null
 };
 
 export type toPrintsCommandsFile = uploadFile & {

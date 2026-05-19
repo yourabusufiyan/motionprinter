@@ -68,6 +68,7 @@ const tools: Tool[] = [
     display: true,
     to: {
       name: 'OroDownload',
+      query: { id: '019e4260-cefd-77d6-b464-19e77c20bccf'}
     }
   },
   {

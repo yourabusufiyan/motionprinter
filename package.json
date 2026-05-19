@@ -104,6 +104,7 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nanoid": "^5.0.9",
+    "original-fs": "^1.2.0",
     "pdf-lib": "^1.17.1",
     "pdf-poppler": "https://github.com/yourabusufiyan/pdf-poppler-next.git",
     "pdf-to-printer": "github:yourabusufiyan/pdf-to-printer-next",

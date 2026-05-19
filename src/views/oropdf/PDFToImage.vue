@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { ArrowRightIcon, Plus, Check, Lock } from 'lucide-vue-next'
+import { Input } from '@/components/ui/input'
+import { ArrowRightIcon, Plus, Check, Lock, EyeIcon, EyeOffIcon } from 'lucide-vue-next'
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, registerRuntimeCompiler } from 'vue'
 import axios from 'axios'
 import { useLordStore } from '@/stores/LordStore'
 import type { oroPdfSettings, uploadFile } from '../../../electron/main/express-app-d'
@@ -28,9 +29,9 @@ const generatingThumbnails = ref<Set<string>>(new Set())
 const showPasswordDialog = ref(false)
 const protectedFiles = ref<Map<string, string>>(new Map())
 const currentPasswordFile = ref<any>(null)
+const showPassword = ref(false)
 const passwordInput = ref('')
 const verifyingPassword = ref(false)
-
 
 const qualityOptions = {
   good: { label: 'Good', dpi: 150 },
@@ -217,15 +218,24 @@ const generateThumbnail = async (file: uploadFile) => {
   generatingThumbnails.value.add(file.id as string)
   try {
 
+    if (file.isPasswordProtected) return;
+
     // Step 1: Try frontend generation using PDF.js
     const uploadedFile = pageData.value.files?.find(f => f.id === file.id)
+
+
     if (file) {
-      const thumbnail = await generateThumbnailFrontend(file)
+      let thumbnail: any;
+      try {
+        thumbnail = await generateThumbnailFrontend(file);
+      } catch (error) {
+        thumbnail = false;
+      }
       if (thumbnail) {
         console.log('Frontend thumbnail generated successfully for file:', file.id)
         file.thumbnail = thumbnail
         generatingThumbnails.value.delete(file.id?.toString() || '')
-        return
+        return;
       }
     }
 
@@ -233,7 +243,7 @@ const generateThumbnail = async (file: uploadFile) => {
     console.log('Frontend generation failed, falling back to backend for file:', file.id)
     const response = await axios.post(`http://${lordStore.db.ip}:9457/api/v1/oropdf/generate-thumbnail`, file)
 
-    if (response.data.success && response.data.step === 'thumbnail_generated') {
+    if (response.data.success) {
       console.log('Backend thumbnail generated successfully for file:', file.id)
       pageData.value.files = pageData.value.files?.map(f => {
         if (f.id === file.id) {
@@ -416,6 +426,11 @@ const submitPassword = async () => {
   }
 }
 
+function togglePassword() {
+  showPassword.value = !showPassword.value;
+  console.log("show password toggle", showPassword.value)
+}
+
 // Create page ID on component mount
 onMounted(() => {
   createPageId();
@@ -463,8 +478,8 @@ onMounted(() => {
         .grid.grid-cols-2.gap-4(class="sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5")
           .flex.flex-col.items-center.gap-1.border.border-2.border-round(v-for="file in pageData.files" :key="file.id")
             div.relative.h-full(class="min-h-[160px] w-full")
-              img.object-cover.bg-gray-200.rounded-lg.w-20.h-24(
-                :src="file.thumbnail?.base64 || file.thumbnail?.url || 'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%23ddd%27 width=%27100%27 height=%27100%27/%3E%3Ctext x=%2750%27 y=%2750%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 font-size=%2714%27 fill=%27%23999%27%3EPDF%3C/text%3E%3C/svg%3E'"
+              img.object-cover.bg-gray-200.rounded-lg.w-full.h-auto.p-1(
+                :src="file.thumbnail?.base64 || ( file.thumbnail ? `http://${lordStore.db.ip}:9457/oropdf/${file.thumbnail}` : '' ) ||  'data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%23ddd%27 width=%27100%27 height=%27100%27/%3E%3Ctext x=%2750%27 y=%2750%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 font-size=%2714%27 fill=%27%23999%27%3EPDF%3C/text%3E%3C/svg%3E'"
                 :alt="file.originalName"
               )
               div.absolute.top-1.right-1(v-if="file.isPasswordProtected")
@@ -493,28 +508,30 @@ onMounted(() => {
         // Content
         .flex.flex-col.h-full.justify-between
           h3.text-2xl.font-bold.leading-none.tracking-tight.py-6.text-center PDF to JPG options
-          .extract-options.flex-1
-            .flex.items-start.space-x-3.rounded-lg.border.p-4.cursor-pointer(
-              :class="{ 'border-primary bg-primary/5': selectedOption === 'page' }"
-              @click="selectedOption = 'page'"
-            )
-              .flex-1
-                .flex.items-center.gap-2
-                  label.font-medium.cursor-pointer(@click="selectedOption = 'page'") PAGE TO JPG
-                  Check(v-if="selectedOption === 'page'" class="w-5 h-5 text-green-600")
-                p.text-sm.text-muted-foreground.mt-1
-                  | Every page of this PDF will be converted into a JPG file.
+          .flex-1
 
-            .flex.items-start.space-x-3.rounded-lg.border.p-4.cursor-pointer(
-                :class="{ 'border-primary bg-primary/5': selectedOption === 'extract' }"
-                @click="selectedOption = 'extract'"
+            .extract-options.hidden
+              .flex.items-start.space-x-3.rounded-lg.border.p-4.cursor-pointer(
+                :class="{ 'border-primary bg-primary/5': selectedOption === 'page' }"
+                @click="selectedOption = 'page'"
               )
                 .flex-1
                   .flex.items-center.gap-2
-                    label.font-medium.cursor-pointer(@click="selectedOption = 'extract'") EXTRACT IMAGES
-                    Check(v-if="selectedOption === 'extract'" class="w-5 h-5 text-green-600")
+                    label.font-medium.cursor-pointer(@click="selectedOption = 'page'") PAGE TO JPG
+                    Check(v-if="selectedOption === 'page'" class="w-5 h-5 text-green-600")
                   p.text-sm.text-muted-foreground.mt-1
-                    | All embedded images inside the PDF will be extracted as JPG images.
+                    | Every page of this PDF will be converted into a JPG file.
+
+              .flex.items-start.space-x-3.rounded-lg.border.p-4.cursor-pointer(
+                  :class="{ 'border-primary bg-primary/5': selectedOption === 'extract' }"
+                  @click="selectedOption = 'extract'"
+                )
+                  .flex-1
+                    .flex.items-center.gap-2
+                      label.font-medium.cursor-pointer(@click="selectedOption = 'extract'") EXTRACT IMAGES
+                      Check(v-if="selectedOption === 'extract'" class="w-5 h-5 text-green-600")
+                    p.text-sm.text-muted-foreground.mt-1
+                      | All embedded images inside the PDF will be extracted as JPG images.
 
             .image-quality.mt-2.px-2
               h3.font-medium.mb-3 Image quality
@@ -563,21 +580,31 @@ onMounted(() => {
   .password-dialog(v-if="showPasswordDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50")
     .bg-white.rounded-lg.p-6.max-w-md.w-full
       h3.text-lg.font-semibold.mb-2 PDF is Password Protected
-      p.text-sm.text-gray-600.mb-1 File: #[b {{ currentPasswordFile?.originalName }}] 
+      .text-wrapper
+      p.text-ellipsis.overflow-hidden.whitespace-nowrap.text-sm.text-gray-600.mb-1 File: #[b {{ currentPasswordFile?.originalName }}] 
       p.text-sm.text-red-600.mb-4(v-if="error") {{ error }}  
       p.text-sm.text-gray-600.mb-4(v-else) Please enter the password to continue
       
-      input.w-full.px-3.py-2.border.border-gray-300.rounded-lg.mb-4(
-        type="password"
-        v-model="passwordInput"
-        placeholder="Enter PDF password"
-        @keyup.enter="submitPassword"
-      )
+      .relative
+        Input.w-full.px-3.py-2.border.border-gray-300.rounded-lg.mb-4( 
+          :type="showPassword ? 'text' : 'password'", 
+          v-model="passwordInput"
+          placeholder="Enter PDF password"
+          @keyup.enter="submitPassword"
+        )
+        button.absolute.right-0.p-3.text-muted-foreground.transition-colors(
+          type="button", 
+          @click="togglePassword()", 
+          :aria-label="showPassword ? 'Hide password' : 'Show password'"
+          class="top-1/2 -translate-y-1/2 hover:text-foreground"
+        )
+          EyeOffIcon.h-4.w-4(v-if="showPassword")
+          EyeIcon.h-4.w-4(v-else)
       
       .flex.justify-end.gap-2
         Button(variant="outline" @click="showPasswordDialog = false" :disabled="verifyingPassword") Cancel
         Button(@click="submitPassword" :disabled="verifyingPassword")
           span(v-if="verifyingPassword") Verifying...
           span(v-else) Submit
-
+pre {{ pageData }}
 </template>

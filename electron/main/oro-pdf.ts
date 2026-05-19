@@ -5,6 +5,9 @@ import pdf from 'pdf-poppler';
 import fs from 'fs';
 import { isEncrypted, decryptPDF } from '@pdfsmaller/pdf-decrypt';
 import AdmZip from 'adm-zip';
+import { PdfInfo } from "./express-app-d";
+
+
 
 export async function pdf2image(file: any): Promise<any> {
   return new Promise(async (resolve, reject) => {
@@ -17,13 +20,15 @@ export async function pdf2image(file: any): Promise<any> {
     );
 
     let opts: any = {
-      format: 'png',
+      format: file?.format || 'jpg',
       scale: 0,
       out_dir: file?.out_dir || path.dirname(file.destination),
       out_prefix: file?.out_prefix || out_prefix,
       page: null,
       args: {}
     };
+
+    opts = Object.assign({}, opts, file.opts)
 
     opts.args.opw = file?.password || '';
     opts.args.upw = file?.password || '';
@@ -53,22 +58,17 @@ export async function pdf2image(file: any): Promise<any> {
   })
 }
 
-export async function checkProtected(file: string): Promise<boolean> {
+export async function checkProtected(file: string): Promise<boolean | PdfInfo> {
   return new Promise(async (resolve, reject) => {
 
     try {
-      const pdfBuffer = fs.readFileSync(file);
-      const result = await isEncrypted(pdfBuffer)
+      let result = await pdf.info(file, { args: { opw: 'Dummy Password With Secret Key' } })
 
-      if (result.encrypted) {
-        console.log('🔒 PDF is PASSWORD PROTECTED');
-        resolve(true);
-      } else {
-        console.log('🔓 PDF is NOT password protected');
-        resolve(false);
-      }
+      console.log('PDF is NOT PASSWORD PROTECTED', result);
+      resolve(result);
     } catch (error) {
-      resolve(false);
+      console.log('PDF is password protected', error);
+      resolve(true);
     }
 
   })
@@ -150,3 +150,4 @@ export async function compressFolderToZip(sourceDir: string, outputPath: string)
     }
   });
 }
+

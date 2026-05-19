@@ -1,18 +1,39 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { filesize, partial } from "filesize";
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Download, Loader2, RotateCcw } from 'lucide-vue-next'
+import { CheckCircle2, Download, Loader2, ArrowLeftCircleIcon } from 'lucide-vue-next'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
 import { useLordStore } from '@/stores/LordStore'
 
-const imageCount = ref(8)
 const totalSize = ref('3.2 MB')
-
+const isAnyProtectedFile = ref(false)
 const lordStore = useLordStore();
 const route = useRoute()
+const router = useRouter()
 const oropdf = lordStore.db.oropdf.find(el => el.id === route.query.id);
+
+const imageCount = computed(() => {
+  return oropdf?.files.reduce((p, c, i) => {
+    if (c.isPasswordProtected) {
+      isAnyProtectedFile.value = true;
+      return p;
+    }
+    return +Number(c?.info?.pages) + p
+  }, 0)
+})
+
+onMounted(() => {
+  lordStore.reloadDatabase()
+})
 
 </script>
 
@@ -36,30 +57,36 @@ const oropdf = lordStore.db.oropdf.find(el => el.id === route.query.id);
 
         // Stats
         .flex.gap-4.justify-center
-          .text-center.hidden
-            .text-2xl.font-bold {{ imageCount }}
-            .text-xs.text-muted-foreground Images
+          .text-center
+            .text-2xl.font-bold {{ imageCount }}{{ isAnyProtectedFile ? '+' : '' }} 
+            .text-xs.text-muted-foreground Image{{ imageCount > 1 || isAnyProtectedFile ? 's': '' }}
           .text-center(v-if="oropdf?.options?.size !== undefined")
             .text-2xl.font-bold {{ filesize(oropdf?.options?.size) }}
+            .text-xs.text-muted-foreground Size
 
-        // Download Button
-        a(:href="`http://${lordStore.db.ip}:9457/oropdf/${oropdf.id}.zip`", download) 
-          Button(
-            size="lg"
-            class="w-full gap-2" 
-          )
-            Download.h-4.w-4
-            span Download ZIP
+        .flex.flex-row.flex-row-reverse.gap-2
+          // Download Button
+          a(:href="`http://${lordStore.db.ip}:9457/oropdf/${oropdf.id}.zip`", download) 
+            Button(
+              size="lg"
+              class="w-full gap-2" 
+            )
+              Download.h-4.w-4
+              span Download ZIP
 
-        // Reset Button
-        Button.hidden(
-          variant="outline"
-          size="sm"
-          class="mt-2"
-        )
-          RotateCcw.h-3.w-3.mr-1
-          span Convert Another
-pre {{ oropdf }}
+          // Reset Button
+          TooltipProvider
+            Tooltip
+              TooltipTrigger(as-child)
+                Button(
+                    size="lg"
+                    class="px-3.5"
+                    variant="outline"
+                  )
+                    ArrowLeftCircleIcon.h-4
+              TooltipContent
+                p Convert Another FIle
+
 </template>
 
 <style scoped lang="stylus">

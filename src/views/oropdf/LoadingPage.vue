@@ -1,5 +1,5 @@
 <template lang="pug">
-.flex.items-center.justify-center.relative
+.flex.items-center.justify-center.relative.min-h-screen
   .max-w-md.w-full.mx-4.animate-in.zoom-in-95.duration-300
     // Main Card
     .bg-card.rounded-xl.border.overflow-hidden
@@ -9,7 +9,7 @@
           .relative
             .absolute.inset-0.rounded-full.bg-primary.animate-ping
             .relative.rounded-full.bg-primary.mb-2
-              Loader2.animate-spin.h-12.w-12.text-primary(v-if="progress < 100")
+              Loader2.animate-spin.h-20.w-20.text-primary(v-if="progress < 100")
               CheckCircle.h-12.w-12.text-primary(v-else)
         p.text-sm.text-muted-foreground.mt-2.text-center {{ message }}
       
@@ -30,17 +30,17 @@
           
           // Warning Badges
           .flex.flex-wrap.gap-2.justify-center
-            .inline-flex.items-center.gap-1.px-2.py-1.rounded-full.bg-destructive.text-destructive.text-xs.font-medium
+            Badge.inline-flex.items-center.gap-1.px-2.py-1(variant="destructive")
               Ban.h-3.w-3
               span Don't close
-            .inline-flex.items-center.gap-1.px-2.py-1.rounded-full.bg-destructive.text-destructive.text-xs.font-medium
+            Badge.inline-flex.items-center.gap-1.px-2.py-1(variant="destructive")
               ArrowLeft.h-3.w-3
               span Don't go back
       
       // Footer
       .px-8.py-4.bg-muted.border-t.border-border.text-center
         p.text-xs.text-muted-foreground Please wait while we complete your request
-pre {{ pageData }}
+
 </template>
 
 <script setup lang="ts">
@@ -51,6 +51,7 @@ import { useRouter } from 'vue-router'
 
 import { Loader2, Ban, ArrowLeft, CheckCircle } from 'lucide-vue-next'
 import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { useLordStore } from '@/stores/LordStore'
 import { merge, isObject } from 'lodash'
 import axios from 'axios'
@@ -95,11 +96,11 @@ ipcRenderer.on('oroLoading', (event, args) => {
   }
 });
 
-// onBeforeMount(() => {
-//   if(!pageData.value) {
-//     router.push({ name: 'oropdf' })
-//   }
-// })
+onBeforeMount(() => {
+  if (!pageData.value) {
+    router.push({ name: 'oropdf' })
+  }
+})
 
 onMounted(() => {
   axios.post(`http://${lordStore.db.ip}:9457/api/v1/oropdf/oro-loading`, { id: pageData.value?.id }).then((res) => {
@@ -114,8 +115,7 @@ onMounted(() => {
   });
 });
 
-onBeforeUnmount(() => {
-})
+
 </script>
 
 <style scoped>

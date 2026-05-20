@@ -13,16 +13,18 @@ import {
 } from '@/components/ui/tooltip'
 
 import { useLordStore } from '@/stores/LordStore'
+// @ts-ignore
+import type { uploadFile } from '../../../electron/main/express-app-d';
 
 const totalSize = ref('3.2 MB')
 const isAnyProtectedFile = ref(false)
 const lordStore = useLordStore();
 const route = useRoute()
 const router = useRouter()
-const oropdf = lordStore.db.oropdf.find(el => el.id === route.query.id);
+const oropdf = lordStore.db.oropdf.find((el: any) => el?.id === route.query.id);
 
 const imageCount = computed(() => {
-  return oropdf?.files.reduce((p, c, i) => {
+  return oropdf?.files.reduce((p: number, c: any, i: any) => {
     if (c.isPasswordProtected) {
       isAnyProtectedFile.value = true;
       return p;
@@ -33,6 +35,9 @@ const imageCount = computed(() => {
 
 onMounted(() => {
   lordStore.reloadDatabase()
+  if (!oropdf?.id) {
+    router.push({ name: 'oropdf' })
+  }
 })
 
 </script>
@@ -66,7 +71,7 @@ onMounted(() => {
 
         .flex.flex-row.flex-row-reverse.gap-2
           // Download Button
-          a(:href="`http://${lordStore.db.ip}:9457/oropdf/${oropdf.id}.zip`", download) 
+          a(:href="`http://${lordStore.db.ip}:9457/oropdf/${oropdf?.id}.zip`", download) 
             Button(
               size="lg"
               class="w-full gap-2" 

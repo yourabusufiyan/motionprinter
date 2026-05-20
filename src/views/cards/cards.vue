@@ -37,6 +37,10 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton';
 import { RocketIcon } from '@radix-icons/vue';
 import {
@@ -481,11 +485,20 @@ const disabledUploadFile = (field: RepeaterItem) => {
     )
       .select-container.w-40.place-self-end
         Label.mb-1(for="cardType") Card Type 
+        
         Select#cardType(@update:modelValue="(value: string) => onSelectChange(value, index)" )
           SelectTrigger.p-5()
             SelectValue(placeholder="Select the Card")
           SelectContent
             SelectItem(
+              v-for="option in options"
+              :key="option.value"
+              :value="option.value"
+              :disabled="option.disabled || false"
+            ) {{ option.label }}
+          NativeSelect
+            NativeSelectOption(value="") Select status
+            NativeSelectOption(
               v-for="option in options"
               :key="option.value"
               :value="option.value"

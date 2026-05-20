@@ -17,7 +17,7 @@
       .p-8.space-y-6
         
         // Progress Bar with Label
-        .w-full.space-y-2.hidd
+        .w-full.space-y-2
           .flex.justify-between.text-xs.text-muted-foreground
             span Progress
             span {{ progress }}%
@@ -44,6 +44,7 @@
 </template>
 
 <script setup lang="ts">
+// @ts-ignore
 import type { oroPdfSettings } from '../../../electron/main/express-app-d'
 
 import { ref, onMounted, onBeforeUnmount } from 'vue'

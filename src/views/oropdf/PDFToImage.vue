@@ -6,6 +6,7 @@ import { ArrowRightIcon, Plus, Check, Lock, EyeIcon, EyeOffIcon } from 'lucide-v
 import { ref, onMounted, computed, registerRuntimeCompiler } from 'vue'
 import axios from 'axios'
 import { useLordStore } from '@/stores/LordStore'
+// @ts-ignore
 import type { oroPdfSettings, uploadFile } from '../../../electron/main/express-app-d'
 import { isObject, merge } from 'lodash'
 import { useRouter } from 'vue-router'
@@ -190,7 +191,7 @@ const uploadFile = async (file: File) => {
       })
 
       // Append the uploaded file to pageData.files
-      if (pageData.value.files) {
+      if (pageData.value?.files) {
         pageData.value.files.push(response.data.fileInfo as uploadFile)
         console.log('Added to pageData.files:', pageData.value.files)
         // Start generating thumbnail in background (frontend first, fallback to backend)
@@ -221,7 +222,7 @@ const generateThumbnail = async (file: uploadFile) => {
     if (file.isPasswordProtected) return;
 
     // Step 1: Try frontend generation using PDF.js
-    const uploadedFile = pageData.value.files?.find(f => f.id === file.id)
+    const uploadedFile = pageData.value.files?.find((f: any) => f.id === file.id)
 
 
     if (file) {
@@ -245,7 +246,7 @@ const generateThumbnail = async (file: uploadFile) => {
 
     if (response.data.success) {
       console.log('Backend thumbnail generated successfully for file:', file.id)
-      pageData.value.files = pageData.value.files?.map(f => {
+      pageData.value.files = pageData.value.files?.map((f: any) => {
         if (f.id === file.id) {
           return { ...f, thumbnail: response.data.thumbnail }
         }
@@ -269,6 +270,7 @@ const generateThumbnailFrontend = async (file: any): Promise<any | null> => {
     const arrayBuffer = await readFileAsArrayBuffer(file)
 
     // Load PDF document
+    // @ts-ignore
     const pdf = await pdfjsLib.getDocument(arrayBuffer).promise
 
     // Get first page
@@ -340,7 +342,7 @@ const handleConvert = async () => {
 
   // Find all protected files that need passwords
   const protectedFilesNeedingPassword = pageData.value.files?.filter(
-    f => f.isPasswordProtected && !protectedFiles.value.has(f.id as string)
+    (f: any) => f.isPasswordProtected && !protectedFiles.value.has(f.id as string)
   ) || []
 
   if (protectedFilesNeedingPassword.length > 0) {
@@ -392,7 +394,7 @@ const submitPassword = async () => {
     // For now, just store the password
     protectedFiles.value.set(currentPasswordFile.value.id, passwordInput.value)
     console.log(`Password stored for file: ${currentPasswordFile.value.id}`)
-    pageData.value.files = pageData.value.files?.map(f => {
+    pageData.value.files = pageData.value.files?.map((f: any) => {
       if (f.id === currentPasswordFile.value.id) {
         return { ...f, ...{ password: passwordInput.value as string } }
       }
@@ -401,7 +403,7 @@ const submitPassword = async () => {
 
     // Check if there are more protected files needing passwords
     const protectedFilesNeedingPassword = pageData.value.files?.filter(
-      f => f.isPasswordProtected && !protectedFiles.value.has(f.id)
+      (f: any) => f.isPasswordProtected && !protectedFiles.value.has(f.id)
     ) || []
 
     if (protectedFilesNeedingPassword.length > 0) {

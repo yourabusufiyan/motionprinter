@@ -19,9 +19,22 @@ export async function pdf2image(file: any): Promise<any> {
       path.extname(file.destination)
     );
 
+    let scale = 1754;
+    switch (file?.dpi) {
+      case 150:
+        scale = 1754;
+        break;
+      case 300:
+        scale = 3508;
+        break;
+      case 600:
+        scale = 7016;
+        break;
+    }
+
     let opts: any = {
       format: file?.format || 'jpg',
-      scale: 0,
+      scale,
       out_dir: file?.out_dir || path.dirname(file.destination),
       out_prefix: file?.out_prefix || out_prefix,
       page: null,

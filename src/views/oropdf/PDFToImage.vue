@@ -444,22 +444,20 @@ onMounted(() => {
 <template lang="pug">
 .w-full.h-screen
   .flex.items-center.justify-center.items-stretch.h-full
-    .upload-area.bg-red-100.flex-1(
+    .upload-area.flex-1.m-2(
       @drop="handleDrop"
       @dragover="handleDragOver"
       @dragleave="handleDragLeave"
-      :class="{ 'bg-blue-100 border-2 border-blue-400': isDragging }"
-      class="border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer flex flex-col overflow-auto"
+      :class="{ 'bg-blue-100 border-2 border-dashed border-blue-500': isDragging }"
+      class="border-2 border-dashed border-white rounded-lg p-8 flex flex-col overflow-auto"
     )
-      div(v-if="!uploading && pageData.files?.length === 0")
-        p.text-lg.font-medium.text-gray-700.mb-4 Drop PDF file here
-        p.text-sm.text-gray-600.mb-6 or
-        .add-file.flex.flex-col.items-center.justify-center.gap-3.p-8.border-2.border-dashed.border-gray-300.rounded-lg.cursor-pointer.transition(
-          @click="triggerFileInput"
-          class="hover:border-blue-400 hover:bg-blue-50"
-        )
-          Plus(class="w-8 h-8 text-gray-600")
-          p.text-sm.font-medium.text-gray-700 Click to browse
+      .text-center(v-if="!uploading && pageData.files?.length === 0")
+        p.text-lg.font-medium.text-gray-700.mt-5 Drop PDF file here
+        p.text-sm.text-gray-600.mb-2 or
+
+        Button.p-6.px-14(size="xlg" @click="triggerFileInput")
+          | Select File
+          Plus
       
       input(
         ref="fileInput"
@@ -505,11 +503,11 @@ onMounted(() => {
         p.text-lg.font-medium.text-red-600 Error
         p.text-sm.text-red-600.mt-2 {{ error }}
       
-    .options(class="basis-1/3 md:basis-1/3 lg:basis-1/4 ")
+    .options.border-l.border-r-2(class="basis-1/3 md:basis-1/3 lg:basis-1/4 ")
         
         // Content
         .flex.flex-col.h-full.justify-between
-          h3.text-2xl.font-bold.leading-none.tracking-tight.py-6.text-center PDF to JPG options
+          h3.text-2xl.font-bold.leading-none.tracking-tight.py-6.text-center PDF to #[span.uppercase {{ route.query.format }}] options
           .flex-1
 
             .extract-options.hidden
@@ -608,5 +606,4 @@ onMounted(() => {
         Button(@click="submitPassword" :disabled="verifyingPassword")
           span(v-if="verifyingPassword") Verifying...
           span(v-else) Submit
-pre {{ pageData }}
 </template>

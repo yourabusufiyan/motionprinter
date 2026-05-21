@@ -1088,11 +1088,11 @@ ipcMain.on(
 
           let opts = {
             format: obj?.saveAs,
-            scale: 1024,
+            scale: 7016,
             out_dir: path.dirname(filePath),
             out_prefix: path.basename(filePath, path.extname(filePath)),
             page: null,
-            args: {},
+            args: { r : 600 },
           };
 
           pdf.convert(tempFile, opts)

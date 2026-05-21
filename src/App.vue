@@ -61,9 +61,6 @@ const router = useRouter();
 const route = useRoute();
 const isAlertOpen = ref(false);
 
-if (route.path == '/') {
-  router.push('/home');
-}
 
 onMounted(async () => {
   axios

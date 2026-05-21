@@ -9,7 +9,7 @@ import {
   TokensIcon,
   ChatBubbleIcon,
 } from '@radix-icons/vue';
-import { Network, IdCard, Grid2x2, FileBox } from 'lucide-vue-next';
+import { Network, IdCard, Grid2x2, FileBox, Send } from 'lucide-vue-next';
 import AnimatedCounter from "vue-animated-counter"
 import NumberFlow from '@number-flow/vue'
 import userCount from './userCount.vue';
@@ -21,7 +21,8 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 const routes = ref([
-  { path: '/home', display: 'Home' },
+  { path: '/', display: 'Home' },
+  { path: '/home', display: 'Send Print' },
   { path: '/card-maker', display: 'Card Maker' },
   { path: '/photosheet-maker', display: 'Photo Sheet' },
   { path: '/oropdf', display: 'OroPDF' },
@@ -103,7 +104,7 @@ aside.top-0.left-0.fixed
         class="sm:mx-auto dark:border-slate-700 xl:my-8"
       )
     .flex.flex-col.justify-between.flex-1.mt-3
-      nav.sidebar-nav.flex-1.-mx-3.space-y-3
+      nav.sidebar-nav.flex-1.-mx-3.space-y-1
         router-link.flex.items-center.px-3.py-2.text-slate-600.transition-colors.duration-300.transform.rounded-lg(
           class="dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 hover:text-slate-700"
           v-for="r in routes"
@@ -113,14 +114,15 @@ aside.top-0.left-0.fixed
             dark:bg-slate-200 dark:text-slate-700 dark:hover:bg-slate-300 dark:hover:text-slate-900
           `
         )
-          HomeIcon(v-if="r.path == '/home'")
+          HomeIcon(v-if="r.path == '/'")
+          Send(stroke-width="2" size="16" v-if="r.path == '/home'")
           IdCard(stroke-width="2" size="16" v-if="r.path == '/card-maker'")
           Grid2x2(stroke-width="2" size="16" v-else-if="r.path == '/photosheet-maker'")
           FileBox(stroke-width="2" size="16" v-else-if="r.path == '/oropdf'")
           Network(stroke-width="1" size="16" v-else-if="r.path == '/connected-pc'")
           CountdownTimerIcon(v-else-if="r.path == '/history'")
           ChatBubbleIcon(stroke-width="2" size="16" v-else-if="r.path == '/inbox'")
-          span.mx-2.text-sm.font-medium
+          span.mx-2.text-md.font-semibold.text-gray-700
             | {{ r.display }}
 
       .mt-6(class="sm:mt-3")

@@ -78,10 +78,13 @@ const stopDrag = (e: MouseEvent | TouchEvent) => {
   document.removeEventListener('mousemove', handleDrag);
   document.removeEventListener('touchmove', handleDrag);
 };
+
+import { X } from 'lucide-vue-next';
+
 </script>
 
 <template lang="pug">
-div.photo-item(
+.photo-item(
   @mousedown="startDrag"
   @touchstart="startDrag"
 )
@@ -91,9 +94,10 @@ div.photo-item(
     alt="Collage photo"
     ref="image"
   )
+  X.remove-icon(
+    @click="$emit('remove')"
+  )
 
-  .cell-controls
-    Button(@click="$emit('remove')" variant="destructive" size="sm") Remove
 </template>
 
 <style lang="stylus" scoped>
@@ -105,18 +109,33 @@ div.photo-item(
 
 img
   position absolute
-  // cursor move
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
 
-.cell-controls
+.remove-icon
   position absolute
-  bottom 10px
-  left 50%
-  transform translateX(-50%)
-  background rgba(255, 255, 255, 0.8)
-  padding 5px
-  border-radius 5px
+  top 0
+  right 0
+  width 20%
+  height 20%
+  color white
+  background-color rgba(220, 38, 38, 0.5)
+  padding 4px
+  cursor pointer
+  transition all 0.2s ease
+  opacity 0
+  
+  &:hover
+    background-color rgb(220, 38, 38)
+
+.photo-item:hover .remove-icon
+  opacity 1
+
+  @media (prefers-color-scheme: dark)
+    background-color rgba(220, 38, 38, 0.8)
+    
+    &:hover
+      background-color rgb(220, 38, 38)
 </style>

@@ -79,18 +79,18 @@ onMounted(() => {
               Download.h-4.w-4
               span Download ZIP
 
-          // Reset Button
-          TooltipProvider
-            Tooltip
-              TooltipTrigger(as-child)
-                Button(
-                    size="lg"
-                    class="px-3.5"
-                    variant="outline"
-                  )
-                    ArrowLeftCircleIcon.h-4
-              TooltipContent
-                p Convert Another FIle
+          .back-option.hidden
+            TooltipProvider
+              Tooltip
+                TooltipTrigger(as-child)
+                  Button(
+                      size="lg"
+                      class="px-3.5"
+                      variant="outline"
+                    )
+                      ArrowLeftCircleIcon.h-4
+                TooltipContent
+                  p Convert Another File
 
 </template>
 

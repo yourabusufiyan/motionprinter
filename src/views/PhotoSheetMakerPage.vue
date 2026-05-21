@@ -187,7 +187,96 @@ const handleCellClick = (index: number, e: MouseEvent, copy: false) => {
   }
 }
 
+// Handle image drop on cells
+const handleDrop = async (e: DragEvent, targetIndex: number) => {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  const files = e.dataTransfer?.files;
+  if (!files || files.length === 0) return;
 
+  // Remove drag overlay class
+  document.querySelectorAll('.grid-cell').forEach(cell => {
+    cell.classList.remove('drag-over');
+  });
+
+  const targetCell = e.currentTarget as HTMLElement;
+  targetCell.classList.remove('drag-over');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file.type.startsWith('image/')) continue;
+
+    const reader = new FileReader();
+    let o: $photoSheetPhoto = {
+      src: '',
+      zoom: 1,
+      rotation: 0,
+      position: { x: 0, y: 0 },
+      width: 0,
+      height: 0,
+    } as $photoSheetPhoto;
+    let index: number = targetIndex;
+
+    reader.onload = (event) => {
+      var image = new Image();
+      image.src = reader.result as string;
+      image.onload = function () {
+        o.width = image.width;
+        o.height = image.height;
+      };
+    };
+    reader.readAsDataURL(file);
+
+    const formData = new FormData();
+    formData.append("sampleFile", file);
+    formData.append("temp", 'true');
+    formData.append("addedBy", lordStore.db.computerName || '');
+
+    try {
+      const response = await axios.post(
+        `http://${lordStore.db.ip}:9457/api/v1/upload/`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      let res: $photoSheetPhoto = response.data;
+      console.log('response', response.data);
+
+      o = {
+        ...o,
+        ...response.data,
+        ...{ src: `http://localhost:9457/temp/${response.data.filename}` }
+      };
+
+      if (files.length === 1) {
+        currentPage.value.photos[index] = o;
+      } else {
+        currentPage.value.photos.splice(index + i, 0, o);
+      }
+
+    } catch (error) {
+      let message = axios.isAxiosError(error)
+        ? error.response?.data.message || "Upload failed"
+        : "An error occurred while uploading the file.";
+      console.error("Upload error:", error);
+    }
+  }
+};
+
+const handleDragOver = (e: DragEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const target = e.currentTarget as HTMLElement;
+  target.classList.add('drag-over');
+};
+
+const handleDragLeave = (e: DragEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  const target = e.currentTarget as HTMLElement;
+  target.classList.remove('drag-over');
+};
 
 const addNewPage = () => {
   pages.value.push({ id: '', photos: [] })
@@ -386,6 +475,9 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
             v-for="(cell, index) in gridCells"
             :key="index"
             @click="handleCellClick(index, $event, true)"
+            @drop="handleDrop($event, index)"
+            @dragover="handleDragOver"
+            @dragleave="handleDragLeave"
             :ref="(el) => setCellRef(el, index)"
             :class=`{
               "cell-empty": !currentPage.photos[index]
@@ -404,7 +496,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
             .cell-placeholder.p-3(
               v-else
               @click="handleCellClick(index, $event, false)"
-            ) Click to add photo
+            ) Click to add photo<br><span class="text-xs">or drag & drop</span>
 
     input.hidden(
       type="file"
@@ -500,7 +592,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
           AccordionTrigger.text-lg.px-6 Layouts
           AccordionContent.bg-gray-50.py-4
             .flex.flex-wrap.gap-3.align-center.justify-center.p-2
-              .div(class="basis-[calc(50%-0.75rem)]" v-for="layout in gridLayouts" :key="layout.value")
+              .div(class="basis-[calc(40%-0.75rem)]" v-for="layout in gridLayouts" :key="layout.value")
                 .grid-container.bg-white.text-center.w-full.border.border-2.p-1(
                   @click.prevent="selectedGrid = layout.value"
                   :class=`[{"border-slate-500" : selectedGrid == layout.value}, ]`
@@ -573,6 +665,9 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   border 1px solid #000
   &.cell-empty
     border 1px dashed #ccc
+  &.drag-over
+    background-color rgba(59, 130, 246, 0.2)
+    border 2px solid #3b82f6
 
 .cell-placeholder
   display flex
@@ -581,6 +676,7 @@ ipcRenderer.on('generate-pdf-reply', (event) => {
   height 100%
   color #666
   cursor pointer
+  flex-direction column
 
 .color-picker-container ::v-deep(.vc-color-wrap)
   height 36px

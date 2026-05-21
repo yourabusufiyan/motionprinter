@@ -41,8 +41,18 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from '@/components/ui/native-select'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton';
-import { RocketIcon } from '@radix-icons/vue';
+import { RocketIcon, QuestionMarkCircledIcon } from '@radix-icons/vue';
 import {
   Loader2,
   RotateCcw,
@@ -52,7 +62,8 @@ import {
   Trash2,
   IdCard,
   Printer,
-  ImageDown
+  ImageDown,
+  ArrowLeftCircleIcon
 } from 'lucide-vue-next';
 
 type cardType =
@@ -481,30 +492,31 @@ const disabledUploadFile = (field: RepeaterItem) => {
     .flex.flex-wrap.gap-2.items-center.border.p-3.rounded-lg.shadow-sm.space-y-4.space-x-4(
       v-for="(field, index) in repeater"
       :key="field.id"
-      class=""
     )
-      .select-container.w-40.place-self-end
-        Label.mb-1(for="cardType") Card Type 
-        
-        Select#cardType(@update:modelValue="(value: string) => onSelectChange(value, index)" )
-          SelectTrigger.p-5()
-            SelectValue(placeholder="Select the Card")
-          SelectContent
-            SelectItem(
-              v-for="option in options"
-              :key="option.value"
-              :value="option.value"
-              :disabled="option.disabled || false"
-            ) {{ option.label }}
-          NativeSelect
-            NativeSelectOption(value="") Select status
-            NativeSelectOption(
-              v-for="option in options"
-              :key="option.value"
-              :value="option.value"
-              :disabled="option.disabled || false"
-            ) {{ option.label }}
+      .select-container.card-type-container.w-40.place-self-end
+        Label.mb-1(:for="'cardType-' + field.id") 
+          | Card Type 
+          Dialog
+            DialogTrigger 
+              QuestionMarkCircledIcon.inline.align-text-top(v-if="field.cardType")
+            DialogContent
+              DialogHeader
+                DialogTitle.text-center.mb-3 Demo File of "{{  options.filter(el => el.value == field.cardType)?.[0].label }}"
+                DialogDescription 
+                  img.border.border-2(
+                    v-if="field?.cardType"
+                    :src="`http://${lordStore.db.ip}:9457/upload/demo-${field.cardType}-9457ai.jpg`"
+                  )
 
+        NativeSelect( :id="'cardType-' + field.id" @update:modelValue="(value: string) => onSelectChange(value, index)" )
+          NativeSelectOption(value="") Select the Card
+          NativeSelectOption(
+            v-for="option in options"
+            :key="option.value"
+            :value="option.value"
+            :disabled="option.disabled || false"
+          ) {{ option.label }}
+      
       .select-container.w-40.place-self-end(v-if="field.cardType === 'pan'")
         Label.mb-1(for="pan-provider") Pan Provider 
         Select#pan-provider(v-model="field.provider")
@@ -592,16 +604,16 @@ const disabledUploadFile = (field: RepeaterItem) => {
   .flex.gap-3.mt-8.flex-wrap
     Button(@click="addRepeaterField" variant="outline" :disabled="isProcessing") #[Plus.m-0.-ml-2] Add New Card
     Button(@click="resetFields" variant="destructive" class="border border-gray-300" ) 
-      | #[RotateCcw.-ml-1] Reset All
+      | #[RotateCcw.-ml-1] Remove All
     Button(@click="onCreate" variant="default")
-      | #[Loader2.w-4.h-4.-ml-1.animate-spin(v-if="isProcessing && false")] #[FileText.-ml-1(v-else)] {{ page?.outputFile ? 'Re-create PDF' : 'Create PDF' }}
+      | #[Loader2.w-4.h-4.-ml-1.animate-spin(v-if="isProcessing && false")] #[FileText.-ml-1(v-else)] {{ page?.outputFile ? 'Re-Submit' : 'Submit' }}
     Button(
       @click="onDownload"
       v-if="page?.outputFile"
       variant="outline"
       class="bg-green-400 text-white"
       
-    ) #[Download.-ml-1] Download PDF
+    ) #[Download.-ml-1] Save as PDF
     Button(
       @click="onPrint()"
       v-if="page?.outputFile"
@@ -613,7 +625,7 @@ const disabledUploadFile = (field: RepeaterItem) => {
       v-if="page?.outputFile"
       variant="outline"
       class="bg-blue-600 text-white"
-    ) #[Printer.-ml-1] New PDF
+    ) #[ArrowLeftCircleIcon.-ml-1] New 
 
   .display-container.mt-10.border.p-4.rounded-lg.shadow-sm.max-w-4xl.h-auto(v-if="!isNull(page)")
     h2.text-xl.font-bold.mb-4 Generated PDF
@@ -673,9 +685,12 @@ const disabledUploadFile = (field: RepeaterItem) => {
 pre.hidden {{ page }}
 </template>
 
-<style lang="stylus" scoped>
+<style lang="stylus">
 .card-container
   & .card-front > .w-full, & .card-back > .w-full {
     aspect-ratio: 1011/638;
   }
+.card-type-container > div > svg {
+  display none !important
+}
 </style>

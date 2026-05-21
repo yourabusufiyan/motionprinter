@@ -48,5 +48,4 @@ if (!lordStore.db.ConnectedPCs.length) {
 <template lang="pug">
 .container.w-100
   PrintDialog
-
 </template>

@@ -2,7 +2,7 @@
   appId: 'com.oroprinter.abusufiyan',
   productName: 'OroPrinter',
   asar: true,
-  icon: 'public/favicon.ico',
+  icon: 'public/icon.ico',
 
   directories: {
     output: 'release/${version}',
@@ -30,7 +30,7 @@
 
   win: {
     target: 'nsis',
-    icon: 'public/favicon.ico',
+    icon: 'public/windows/icon.ico',
     artifactName: '${productName}-Setup-${version}.${ext}',
   },
 

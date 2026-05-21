@@ -10,13 +10,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'entry',
-    redirect: '/home',
+    component: () => import('../views/ScanToReceive.vue'),
+    meta: { title: 'Home' },
   },
   {
     path: '/home',
     name: 'home',
     component: () => import('../views/HomePage.vue'),
-    meta: { title: 'Home' },
   },
   {
     path: '/inbox',

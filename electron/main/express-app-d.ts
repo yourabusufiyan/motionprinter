@@ -152,3 +152,21 @@ export type oroPdfSettings = {
   service?: 'pdf-to-image' | 'pdf-to-png' | 'pdf-to-jpg';
 
 }
+
+export type Scanner = {
+  token?: string,
+  files?: ScannerFileData[] | null,
+}
+
+export type ScannerFileData = {
+  id: string,
+  computerID: string,
+  fileName: string,
+  storedName: string,
+  filePath: string,
+  fileSize: number,
+  mimeType: string,
+  description: string,
+  uploadedAt: string,
+  downloadedAt: string | null,
+}

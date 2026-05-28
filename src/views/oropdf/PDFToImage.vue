@@ -19,8 +19,15 @@ const pageId = ref<string>('')
 const creatingPageId = ref(false)
 const lordStore = useLordStore()
 const isDragging = ref(false)
-const uploading = ref(false)
-const uploadProgress = ref(0)
+type UploadingFile = {
+  id: string
+  originalName: string
+  progress: number
+  status: 'uploading' | 'error'
+  error?: string
+}
+const uploadingFiles = ref<UploadingFile[]>([])
+const uploading = computed(() => uploadingFiles.value.some((file) => file.status === 'uploading'))
 const uploadedFile = ref<any>(null)
 const error = ref('')
 const selectedOption = ref('page')
@@ -160,9 +167,15 @@ const uploadFile = async (file: File) => {
     return
   }
 
-  uploading.value = true
-  uploadProgress.value = 0
+  const uploadItem: UploadingFile = {
+    id: `${file.name}-${file.lastModified}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    originalName: file.name,
+    progress: 0,
+    status: 'uploading'
+  }
+  uploadingFiles.value.push(uploadItem)
   error.value = ''
+  let uploadedSuccessfully = false
 
   const formData = new FormData()
   formData.append('sampleFile', file)
@@ -172,7 +185,8 @@ const uploadFile = async (file: File) => {
     const response = await axios.post(`http://${lordStore.db.ip}:9457/api/v1/oropdf/upload-pdf`, formData, {
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total) {
-          uploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          uploadItem.progress = progress
         }
       }
     })
@@ -193,6 +207,7 @@ const uploadFile = async (file: File) => {
       // Append the uploaded file to pageData.files
       if (pageData.value?.files) {
         pageData.value.files.push(response.data.fileInfo as uploadFile)
+        uploadedSuccessfully = true
         console.log('Added to pageData.files:', pageData.value.files)
         // Start generating thumbnail in background (frontend first, fallback to backend)
         generateThumbnail(response.data.fileInfo)
@@ -204,9 +219,14 @@ const uploadFile = async (file: File) => {
 
   } catch (err: any) {
     console.error('Upload error:', err)
-    error.value = err.response?.data?.error || 'Failed to upload file'
+    const uploadError = err.response?.data?.error || 'Failed to upload file'
+    uploadItem.status = 'error'
+    uploadItem.error = uploadError
+    error.value = uploadError
   } finally {
-    uploading.value = false
+    if (uploadedSuccessfully) {
+      uploadingFiles.value = uploadingFiles.value.filter((item) => item.id !== uploadItem.id)
+    }
     saveToMain();
   }
 }
@@ -362,7 +382,7 @@ const handleConvert = async () => {
     console.log('Final pageData being sent for conversion:', pageData.value)
     router.push({
       name: 'OroLoading',
-      query: { id: pageData.value.id }
+      query: { id: pageData.value.id, format: route.query.format }
     })
   }
 }
@@ -468,14 +488,22 @@ onMounted(() => {
         @change="handleFileInput"
       )
       
-      div(v-if="uploading")
-        p.text-lg.font-medium.text-blue-600 Uploading...
-        p.text-sm.text-blue-600.mt-2 {{ uploadProgress }}%
-        .bg-blue-200.rounded-full.h-2.w-48.mt-4
-          .bg-blue-600.rounded-full.h-2.transition-all(:style="{ width: `${uploadProgress}%` }")
-      
-      div(v-if="pageData.files && pageData.files.length > 0" class="w-full")
+      div(v-if="(pageData.files && pageData.files.length > 0) || uploadingFiles.length > 0" class="w-full")
         .grid.grid-cols-2.gap-4(class="sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5")
+          .flex.flex-col.items-center.gap-1.border.border-2.border-round(
+            v-for="uploadFile in uploadingFiles"
+            :key="uploadFile.id"
+          )
+            div.relative.h-full.flex.items-center.justify-center.bg-gray-100.rounded-lg.p-3(class="min-h-[160px] w-full")
+              .w-full
+                p.text-sm.font-medium.text-blue-600.text-center(v-if="uploadFile.status === 'uploading'") Uploading...
+                p.text-sm.font-medium.text-red-600.text-center(v-else) Upload failed
+                p.text-xs.text-blue-600.text-center.mt-2(v-if="uploadFile.status === 'uploading'") {{ uploadFile.progress }}%
+                p.text-xs.text-red-600.text-center.mt-2.line-clamp-2(v-else) {{ uploadFile.error }}
+                .bg-blue-200.rounded-full.h-2.w-full.mt-4(v-if="uploadFile.status === 'uploading'")
+                  .bg-blue-600.rounded-full.h-2.transition-all(:style="{ width: `${uploadFile.progress}%` }")
+            p.text-xs.text-gray-700.text-center.truncate.w-20.pb-1 {{ uploadFile.originalName }}
+
           .flex.flex-col.items-center.gap-1.border.border-2.border-round(v-for="file in pageData.files" :key="file.id")
             div.relative.h-full(class="min-h-[160px] w-full")
               img.object-cover.bg-gray-200.rounded-lg.w-full.h-auto.p-1(
@@ -573,7 +601,7 @@ onMounted(() => {
               @click="handleConvert"
               :disabled="!pageData.files || pageData.files.length === 0"
             )
-              | Convert to JPG 
+              | Convert to {{ route.query.format ? route.query.format.toUpperCase() : 'JPG' }} 
               ArrowRightIcon
 
   // Password Dialog

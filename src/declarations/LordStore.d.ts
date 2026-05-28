@@ -7,6 +7,7 @@ import type {
   uploadFile,
   photoSheetPhoto,
   oroPdfSettings,
+  Scanner,
 } from '../../electron/main/express-app-d';
 import type { localPrinter } from './PrintersList';
 
@@ -29,6 +30,7 @@ export type lordData = {
     cardMaker | toPrintsCommandsFile | Trash | uploadFile | photoSheetPhoto
   >;
   oropdf: oroPdfSettings[];
+  scanner: Scanner;
 };
 
 export type computerProfile = {

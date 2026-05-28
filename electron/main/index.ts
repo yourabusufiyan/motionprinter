@@ -46,6 +46,29 @@ process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
   : process.env.DIST;
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
+const autoLaunchArgs = ['--hidden'];
+const cleanupAutoLaunchArgs = [
+  '--squirrel-uninstall',
+  '--squirrel-obsolete',
+  '--uninstall',
+];
+const isHiddenLaunch = process.argv.includes('--hidden');
+
+function setAutoLaunch(openAtLogin: boolean) {
+  if (process.platform !== 'win32') return;
+
+  app.setLoginItemSettings({
+    openAtLogin,
+    path: app.getPath('exe'),
+    args: autoLaunchArgs,
+  });
+}
+
+if (cleanupAutoLaunchArgs.some((arg) => process.argv.includes(arg))) {
+  setAutoLaunch(false);
+  app.quit();
+  process.exit(0);
+}
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith('6.1')) app.disableHardwareAcceleration();
@@ -64,7 +87,13 @@ if (!app.requestSingleInstanceLock()) {
 // process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 let win: BrowserWindow | null = null;
-let tray = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 // Here, you can also use other preload
 const preload = path.join(__dirname, '../preload/index.js');
 const url = process.env.VITE_DEV_SERVER_URL;
@@ -81,10 +110,9 @@ const dir = [
 
 dir.map((el) => !fs.existsSync(el) && fs.mkdirSync(el, { recursive: true }));
 
-app.setLoginItemSettings({
-  openAtLogin: true,
-  args: ['--hidden'],
-});
+if (app.isPackaged) {
+  setAutoLaunch(true);
+}
 
 // Global settings for dev and production
 if (!process.env.VITE_DEV_SERVER_URL) {
@@ -102,6 +130,7 @@ async function createWindow() {
     icon: path.join(process.env.PUBLIC, 'favicon.ico'),
     width: 1220,
     height: 600,
+    show: !isHiddenLaunch,
 
     webPreferences: {
       preload,
@@ -135,7 +164,10 @@ async function createWindow() {
     },
     {
       label: 'Quit',
-      click: () => app.quit(),
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
     },
   ]);
   tray.setToolTip('OroPrinter'); // Tooltip for the tray icon
@@ -152,17 +184,10 @@ async function createWindow() {
   });
 
   win.on('close', (event) => {
-    // @ts-ignore
-    if (!app?.isQuitting) {
+    if (!isQuitting) {
       event.preventDefault(); // Prevent the window from closing
       win?.hide(); // Hide the window instead
     }
-  });
-
-  // Quit the app when the tray icon is right-clicked and "Quit" is selected
-  app.on('before-quit', () => {
-    // @ts-ignore
-    app.isQuitting = true;
   });
 
   // Test actively push message to the Electron-Renderer
@@ -178,6 +203,10 @@ async function createWindow() {
 }
 
 app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  // Keep the process alive so the tray/background service continues running.
+});
 
 app.on('second-instance', () => {
   if (win) {
@@ -1092,7 +1121,7 @@ ipcMain.on(
             out_dir: path.dirname(filePath),
             out_prefix: path.basename(filePath, path.extname(filePath)),
             page: null,
-            args: { r : 600 },
+            args: { r: 600 },
           };
 
           pdf.convert(tempFile, opts)

@@ -32,6 +32,18 @@ const imageCount = computed(() => {
     return +Number(c?.info?.pages) + p
   }, 0)
 })
+const format = computed(() => {
+  if (route.query.format === 'jpg') {
+    return 'JPG'
+  } else if (route.query.format === 'png') {
+    return 'PNG'
+  } else if (route.query.format === 'tiff') {
+    return 'TIFF'
+  } else if (route.query.format === 'svg') {
+    return 'SVG'
+  }
+  return route.query.format
+})
 
 onMounted(() => {
   lordStore.reloadDatabase()
@@ -57,8 +69,8 @@ onMounted(() => {
 
         // Title
         .space-y-2
-          h2.text-2xl.font-semibold.tracking-tight PDF Converted!
-          p.text-muted-foreground Your PDF has been converted to JPG images
+          h2.text-2xl.font-semibold.tracking-tight Zip File ready!
+          p.text-muted-foreground All of your files compressed and ready for download.
 
         // Stats
         .flex.gap-4.justify-center

@@ -99,7 +99,7 @@ ipcRenderer.on('oroLoading', (event, args) => {
 
 onBeforeMount(() => {
   if (!pageData.value) {
-    router.push({ name: 'oropdf' })
+    router.push({ name: 'oropdf', query: { id: route.query.id, format: route.query.format } })
   }
 })
 

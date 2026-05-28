@@ -75,11 +75,12 @@ class expressAppClass {
   static isServerRunning = false;
   static ip = ip.address();
   static dir = [
-    join(os.homedir(), app.getName(), './public/'),
-    join(os.homedir(), app.getName(), './upload/'),
-    join(os.homedir(), app.getName(), './db/'),
-    join(os.homedir(), app.getName(), './temp/'),
-    join(os.homedir(), app.getName(), './oropdf/'),
+    join(os.homedir(), app.getName(), './public/'), // 0
+    join(os.homedir(), app.getName(), './upload/'), // 1
+    join(os.homedir(), app.getName(), './db/'),     // 2  
+    join(os.homedir(), app.getName(), './temp/'),   // 3
+    join(os.homedir(), app.getName(), './oropdf/'), // 4
+    join(os.homedir(), app.getName(), './scanner/'),// 5
   ];
 
   static computerName: string | undefined = process.env.COMPUTERNAME;
@@ -134,7 +135,8 @@ class expressAppClass {
       offlineComputers: [],
       cardMaker: [],
       temp: [],
-      oropdf: []
+      oropdf: [],
+      scanner: {}
     };
   }
 
@@ -401,7 +403,7 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
-        let domain = "https://mp.snacksoft.in"
+        let domain = "http://localhost:3000/count"
         let computerName = this.db.data.computerName || '';
         let userId = this.db.data.id || '';
         let url = `${domain}/?user_id=${userId}&computerName=${computerName}`;
@@ -415,6 +417,58 @@ class expressAppClass {
         await sleep(random(20_000, 40_000));
       }
     }, 20_000);
+
+    setTimeout(async () => {
+      while (false) {
+
+        let scanner = this.db.data.scanner;
+        console.log('Checking for scanned files...', scanner?.file);
+        if (scanner?.file) {
+          for (const [index, file] of scanner?.file?.entries()) {
+            console.log(`Index: ${index}, File: ${file}`);
+            const url = `http://localhost:3000/uploads/${file.storedName}`;
+            const outputPath = path.join(this.dir[5], file.storedName);
+            console.log('Starting download...');
+
+            // const response = await axios({
+            //   method: 'GET',
+            //   url: url,
+            //   responseType: 'stream'
+            // });
+
+            // const totalSize = parseInt(response.headers['content-length'], 10);
+            // console.log(`File size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+
+
+            // let downloaded = 0;
+            // const startTime = Date.now();
+
+            // response.data.on('data', (chunk: any) => {
+            //   downloaded += chunk.length;
+            //   const percent = (downloaded / totalSize * 100).toFixed(1);
+            //   const speed = downloaded / ((Date.now() - startTime) / 1000);
+
+            //   process.stdout.write(`\rProgress: ${percent}% | Speed: ${(speed / 1024 / 1024).toFixed(2)} MB/s`);
+
+            // });
+
+            // const writer = fs.createWriteStream(outputPath);
+            // response.data.pipe(writer);
+
+            // await new Promise((resolve, reject) => {
+            //   writer.on('finish', resolve);
+            //   writer.on('error', reject);
+            // });
+
+            // const duration = (Date.now() - startTime) / 1000;
+            // console.log(`\n✅ Download completed in ${duration.toFixed(2)}s`);
+
+            await sleep(random(1_000, 5_000));
+          }
+        }
+
+      }
+    }, 5_000);
 
   }
 

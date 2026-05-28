@@ -73,7 +73,7 @@ ipcRenderer.on('onlineUsers', async (event, arg) => {
   console.log('onlineUsers', arg);
   onlineUsers.value = arg;
   // onlineUsersCount.value = +arg?.online_users + random(10, 50) + ranInitial;
-  let userCountDifference = +arg?.online_users + random(36, 96) + ranInitial.value - onlineUsersCount.value;
+  let userCountDifference = +arg?.onlineCount + random(36, 96) + ranInitial.value - onlineUsersCount.value;
   console.log('userCountDifference', userCountDifference);
   let parts = randomizeTo12Parts(userCountDifference);
   console.log('parts', parts);
@@ -140,7 +140,7 @@ aside.top-0.left-0.fixed
           .small-nav.text-xs.font-semibold(class="space-x-1.5")
             router-link( to="/help" class="underline hover:no-underline") HELP
             router-link( to="/help#faq" class="underline hover:no-underline") FAQs
-            .inline.online-users-count(v-if="onlineUsers?.online_users")
+            .inline.online-users-count(v-if="onlineUsers?.onlineCount")
               userCount(:value="+onlineUsersCount" :diff="+diff")
 
           .flex.items-center.gap-x-2

@@ -1,2 +1,0 @@
-1.1.3
-  * on Apaar and ABC type changing, current selected file should be re-created 

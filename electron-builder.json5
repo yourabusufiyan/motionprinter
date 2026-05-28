@@ -39,5 +39,6 @@
     perMachine: true,
     deleteAppDataOnUninstall: true,
     allowToChangeInstallationDirectory: true,
+    include: 'build/installer.nsh',
   },
 }

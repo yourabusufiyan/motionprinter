@@ -65,11 +65,13 @@ import dayjs from 'dayjs';
 import { checkProtected, pdf2image as oroPdf2Image, verifyPassword, createFolder, compressFolderToZip } from './oro-pdf';
 import { c } from 'vite/dist/node/moduleRunnerTransport.d-DJ_mE5sf';
 import sanitize from 'sanitize-filename'
+import { deleteFileIfExists } from './oro-scanner';
 
 class expressAppClass {
   static app = express();
   static router = express.Router();
   static oroPDF = express.Router();
+  static oroScanner = express.Router();
   static port = 9457;
   static server: any = '';
   static isServerRunning = false;
@@ -271,6 +273,7 @@ class expressAppClass {
     this.app.use('/temp/', express.static(this.dir[3]));
     this.app.use('/api/v1/', this.router);
     this.app.use('/api/v1/oropdf/', this.oroPDF);
+    this.app.use('/api/v1/oroscanner/', this.oroScanner);
     this.app.use((_req: any, _res: any, next: any) => next(createError(404)));
     this.app.use((err: any, req: any, res: any, _next: any) => {
       res.locals.title = 'error';
@@ -403,7 +406,7 @@ class expressAppClass {
 
     setTimeout(async () => {
       while (true) {
-        let domain = "http://localhost:3000/count"
+        let domain = "http://80.225.220.97:3000/count"
         let computerName = this.db.data.computerName || '';
         let userId = this.db.data.id || '';
         let url = `${domain}/?user_id=${userId}&computerName=${computerName}`;
@@ -419,54 +422,99 @@ class expressAppClass {
     }, 20_000);
 
     setTimeout(async () => {
-      while (false) {
-
+      while (true) {
         let scanner = this.db.data.scanner;
-        console.log('Checking for scanned files...', scanner?.file);
-        if (scanner?.file) {
-          for (const [index, file] of scanner?.file?.entries()) {
-            console.log(`Index: ${index}, File: ${file}`);
-            const url = `http://localhost:3000/uploads/${file.storedName}`;
-            const outputPath = path.join(this.dir[5], file.storedName);
-            console.log('Starting download...');
+        if (scanner?.files) {
+          for (const [index, file] of scanner?.files?.entries()) {
+            // Skip if already downloaded
+            if (file?.downloadedAt) {
+              // console.log(`File already downloaded: ${file.fileName}, skipping...`);
+              continue;
+            }
 
-            // const response = await axios({
-            //   method: 'GET',
-            //   url: url,
-            //   responseType: 'stream'
-            // });
+            const baseDomain = `http://80.225.220.97:3000`;
+            const fileInfo = `${baseDomain}/file/${file.id}`
+            const fileUrl = `${baseDomain}/download/${file.id}`;
+            const outputPath = path.join(this.dir[5], file.storedName || '');
 
-            // const totalSize = parseInt(response.headers['content-length'], 10);
-            // console.log(`File size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
+            let getFileInfo: any;
+            try {
+              getFileInfo = await axios.get(fileInfo);
+              console.log('File info response:', getFileInfo.data);
+            } catch (err) {
+              console.log(`File does not exist on server ${file.id}:`);
+              continue;
+            }
 
+            const response = await axios({
+              method: 'GET',
+              url: fileUrl,
+              responseType: 'stream'
+            });
 
-            // let downloaded = 0;
-            // const startTime = Date.now();
+            const totalSize = parseInt(response.headers['content-length'], 10);
+            console.log(`File size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`);
 
-            // response.data.on('data', (chunk: any) => {
-            //   downloaded += chunk.length;
-            //   const percent = (downloaded / totalSize * 100).toFixed(1);
-            //   const speed = downloaded / ((Date.now() - startTime) / 1000);
+            let downloaded = 0;
+            const startTime = Date.now();
 
-            //   process.stdout.write(`\rProgress: ${percent}% | Speed: ${(speed / 1024 / 1024).toFixed(2)} MB/s`);
+            response.data.on('data', (chunk: any) => {
+              downloaded += chunk.length;
+              const percent = (downloaded / totalSize * 100);
+              const speed = downloaded / ((Date.now() - startTime) / 1000);
 
-            // });
+              process.stdout.write(`\rProgress: ${percent.toFixed(1)}% | Speed: ${(speed / 1024 / 1024).toFixed(2)} MB/s`);
 
-            // const writer = fs.createWriteStream(outputPath);
-            // response.data.pipe(writer);
+              // Send progress to renderer with full file object
+              if (this.win) {
+                this.win.webContents.send('downloadProgress', {
+                  percent: Math.round(percent),
+                  speed: speed,
+                  file: file  // Send full file object
+                });
+              }
+            });
 
-            // await new Promise((resolve, reject) => {
-            //   writer.on('finish', resolve);
-            //   writer.on('error', reject);
-            // });
+            const writer = fs.createWriteStream(outputPath);
+            response.data.pipe(writer);
 
-            // const duration = (Date.now() - startTime) / 1000;
-            // console.log(`\n✅ Download completed in ${duration.toFixed(2)}s`);
+            await new Promise((resolve, reject) => {
+              writer.on('finish', resolve);
+              writer.on('error', reject);
+            });
+
+            const duration = (Date.now() - startTime) / 1000;
+            console.log(`\n✅ Download completed in ${duration.toFixed(2)}s: ${outputPath}`);
+
+            // Update downloadedAt in database
+            if (this.db.data.scanner?.files?.[index]) {
+              this.db.data.scanner.files[index].downloadedAt = new Date().toISOString();
+              this.db.write();
+
+              // Notify renderer about completion
+              if (this.win) {
+                this.win.webContents.send('downloadComplete', {
+                  file: file,
+                  downloadedAt: new Date().toISOString()
+                });
+              }
+            }
+
+            // Delete from server after successful download
+            await axios.delete(`${baseDomain}/upload/${file.id}`, {
+              headers: {
+                'Authorization': this.db.data.scanner?.token || this.db.data.scanner?.registration?.token
+              }
+            }).then(() => {
+              console.log(`Deleted file from server: ${file.id}`);
+            }).catch((err) => {
+              console.error(`Error deleting file from server: ${file.id}`, err);
+            });
 
             await sleep(random(1_000, 5_000));
           }
         }
-
+        await sleep(random(3_000, 6_000));
       }
     }, 5_000);
 
@@ -582,6 +630,8 @@ class expressAppClass {
     this.oroPDF.post('/verify-password', this.verifyPassword.bind(this));
     this.oroPDF.post('/generate-thumbnail', this.generateThumbnail.bind(this));
     this.oroPDF.post('/oro-loading', this.oroLoading.bind(this));
+
+    this.oroScanner.delete('/delete-file/:id', this.oroScannerDeleteFile.bind(this));
 
     const routerRoutes = listEndpoints(this.app);
     console.table(routerRoutes);
@@ -1075,6 +1125,62 @@ class expressAppClass {
     }
 
 
+  }
+
+  static async oroScannerDeleteFile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const fileId = req.params.id || req.body.id;
+      console.log('Deleting file with id:', fileId);
+
+      if (!fileId) {
+        return res.status(400).json({
+          success: false,
+          message: 'File ID is required'
+        });
+      }
+
+      if (!this.db.data.scanner?.files) {
+        return res.status(404).json({
+          success: false,
+          message: 'No files found'
+        });
+      }
+
+      const fileIndex = this.db.data.scanner.files.findIndex(f => f.id === fileId);
+
+      if (fileIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: 'File not found'
+        });
+      }
+
+      // Get file info before deletion
+      const deletedFile = this.db.data.scanner.files[fileIndex];
+
+      deleteFileIfExists(path.join(this.dir[5], deletedFile.storedName || ''));
+
+      // Remove from array
+      this.db.data.scanner.files.splice(fileIndex, 1);
+
+      // Save to database
+      this.db.write();
+
+      console.log('File deleted successfully:', deletedFile.fileName);
+
+      res.status(200).json({
+        success: true,
+        message: 'File deleted successfully',
+        file: deletedFile
+      });
+
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
   }
 
 }

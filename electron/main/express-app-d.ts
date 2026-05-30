@@ -155,6 +155,15 @@ export type oroPdfSettings = {
 
 export type Scanner = {
   token?: string,
+  registration?: {
+    success: boolean,
+    computerID: string,
+    token: string,
+    message: string,
+    createdAt: string,
+    updatedAt: string,
+  },
+  refreshInterval: number,
   files?: ScannerFileData[] | null,
 }
 

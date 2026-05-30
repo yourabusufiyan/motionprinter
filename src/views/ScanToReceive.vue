@@ -5,6 +5,8 @@ import { Trash2Icon, Printer, File, Search, FileText, RefreshCw, Eye, HardDrive,
 import axios from 'axios'
 import { useLordStore } from '@/stores/LordStore'
 import { findIndex } from 'lodash'
+import { ipcRenderer } from 'electron'
+import type { IpcRendererEvent } from 'electron/renderer'
 
 type CreateResponse = {
   success: boolean
@@ -26,6 +28,8 @@ type ScannerFileData = {
   description: string
   uploadedAt: string
   downloadedAt: string | null
+  downloadProgress?: number
+  downloadSpeed?: number
 }
 
 // State
@@ -35,14 +39,14 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const lordStore = useLordStore()
 const createdID = ref<CreateResponse>({} as CreateResponse)
-const files = ref<ScannerFileData[]>(lordStore.db.scanner?.files || [])
+const files = ref<ScannerFileData[]>(lordStore.db.scanner?.files?.reverse() || [])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const isPolling = ref(false)
 const lastUpdated = ref('')
 const updating = ref(false)
 const showRefreshSettings = ref(false)
-const refreshInterval = ref(5000) // Default 5 seconds
+const refreshInterval = ref(5000)
 let intervalId: any = null
 
 // Refresh interval options
@@ -59,7 +63,7 @@ const refreshOptions = [
 
 // Axios instance
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:3000/',
+  baseURL: `http://80.225.220.97:3000`,
 })
 
 // Computed properties
@@ -98,7 +102,7 @@ const displayedPages = computed(() => {
 })
 
 const totalSize = computed(() => {
-  return files.value.reduce((sum, file) => sum + file.fileSize, 0)
+  return files.value.reduce((sum, file) => sum + (file.fileSize || 0), 0)
 })
 
 const downloadedFiles = computed(() => {
@@ -110,7 +114,7 @@ const pendingFiles = computed(() => {
 })
 
 const currentRefreshOption = computed(() => {
-  return refreshOptions.find(opt => opt.value === refreshInterval.value) || refreshOptions[2]
+  return refreshOptions.find(opt => opt.value === refreshInterval.value) || refreshOptions[3]
 })
 
 // Utility functions
@@ -120,6 +124,21 @@ const formatFileSize = (bytes: number): string => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// Format time
+const formatTime = (seconds: number): string => {
+  if (seconds < 60) return `${Math.floor(seconds)}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.floor(seconds % 60)}s`
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+}
+
+// Calculate ETA
+const calculateETA = (totalSize: number, speed: number, progress: number): string => {
+  if (!speed || speed === 0 || progress >= 100) return '--'
+  const remainingBytes = totalSize * (1 - progress / 100)
+  const etaSeconds = remainingBytes / speed
+  return formatTime(etaSeconds)
 }
 
 const formatDate = (date: string | Date): string => {
@@ -145,11 +164,11 @@ const formatDate = (date: string | Date): string => {
 }
 
 const getFileIcon = (mimeType: string) => {
-  if (mimeType.includes('pdf')) return '📄'
-  if (mimeType.includes('image')) return '🖼️'
-  if (mimeType.includes('video')) return '🎥'
-  if (mimeType.includes('audio')) return '🎵'
-  if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦'
+  if (mimeType?.includes('pdf')) return '📄'
+  if (mimeType?.includes('image')) return '🖼️'
+  if (mimeType?.includes('video')) return '🎥'
+  if (mimeType?.includes('audio')) return '🎵'
+  if (mimeType?.includes('zip') || mimeType?.includes('rar')) return '📦'
   return '📁'
 }
 
@@ -170,29 +189,57 @@ const printFile = (file: ScannerFileData) => {
 }
 
 const previewFile = (file: ScannerFileData) => {
-  if (file.filePath) {
-    window.open(file.filePath, '_blank')
+  if (file.storedName) {
+    window.open(`http://${lordStore.db.ip}:9457/scanner/${file.storedName}`, '_blank')
   }
 }
 
 const deleteFile = async (file: ScannerFileData) => {
-  if (confirm(`Are you sure you want to delete "${file.fileName}"?`)) {
-    try {
-      await axiosInstance.delete(`/upload/${file.id}`, {
-        headers: { 'Authorization': createdID.value.token }
-      })
+  if (!confirm(`Are you sure you want to delete "${file.fileName}"?`)) {
+    return
+  }
+
+  try {
+    const token = createdID.value.token
+    const deleteResponse = await axios.delete(
+      `http://${lordStore.db.ip}:9457/api/v1/oroscanner/delete-file/${file.id}`,
+      {
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+
+    console.log('Delete response:', deleteResponse.data)
+
+    if (deleteResponse.data.success) {
       const index = files.value.findIndex(f => f.id === file.id)
       if (index !== -1) {
         files.value.splice(index, 1)
         lordStore.db.scanner.files = files.value
         saveToMain()
+        console.log('File deleted successfully:', file.fileName)
+        showMessage('File deleted successfully', 'success')
       }
-    } catch (err: any) {
-      console.error('Error deleting file:', err)
-      error.value = err.response?.data?.error || 'Failed to delete file'
-      setTimeout(() => { error.value = null }, 3000)
+    } else {
+      throw new Error(deleteResponse.data.message || 'Failed to delete file')
     }
+  } catch (err: any) {
+    console.error('Error deleting file:', err)
+    const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to delete file'
+    error.value = errorMsg
+    showMessage(errorMsg, 'error')
+    setTimeout(() => { error.value = null }, 3000)
   }
+}
+
+const showMessage = (message: string, type: 'success' | 'error') => {
+  const toast = document.createElement('div')
+  toast.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} animate-fade-in`
+  toast.textContent = message
+  document.body.appendChild(toast)
+  setTimeout(() => toast.remove(), 3000)
 }
 
 // Pagination
@@ -200,7 +247,7 @@ const previousPage = () => { if (currentPage.value > 1) currentPage.value-- }
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 const goToPage = (page: number) => { currentPage.value = page }
 
-// Fetch files - optimized to prevent blinking
+// Fetch files
 async function fetchFiles(token: string) {
   if (!token || updating.value) return
 
@@ -214,7 +261,6 @@ async function fetchFiles(token: string) {
     if (response.data?.files) {
       const newFiles = updateOrAddFiles(files.value, response.data.files)
 
-      // Only update if there are actual changes
       if (JSON.stringify(files.value) !== JSON.stringify(newFiles)) {
         files.value = newFiles
         lordStore.db.scanner.files = newFiles
@@ -238,7 +284,6 @@ function updateOrAddFiles(oldArray: ScannerFileData[], newArray: ScannerFileData
   newArray.forEach(newFile => {
     const existingIndex = findIndex(result, { id: newFile.id })
     if (existingIndex !== -1) {
-      // Only update if data actually changed
       if (JSON.stringify(result[existingIndex]) !== JSON.stringify(newFile)) {
         result[existingIndex] = {
           ...result[existingIndex],
@@ -265,20 +310,19 @@ function saveToMain() {
   lordStore.saveLowDB()
 }
 
-// Load saved refresh interval from store
+// Load saved refresh interval
 function loadRefreshInterval() {
   if (lordStore.lowdb.data.scanner?.refreshInterval) {
     refreshInterval.value = lordStore.lowdb.data.scanner.refreshInterval
   }
 }
 
-// Polling with dynamic interval
+// Polling
 const startPolling = () => {
   if (intervalId) clearInterval(intervalId)
   isPolling.value = true
   if (createdID.value.token) fetchFiles(createdID.value.token)
 
-  // Use dynamic interval
   intervalId = setInterval(() => {
     if (isPolling.value && createdID.value.token) {
       fetchFiles(createdID.value.token)
@@ -299,14 +343,11 @@ const changeRefreshInterval = async (newInterval: number) => {
   refreshInterval.value = newInterval
   saveToMain()
 
-  // Restart polling with new interval
   if (isPolling.value) {
     stopPolling()
     startPolling()
   }
 
-  // Show success message
-  error.value = null
   const message = document.createElement('div')
   message.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in'
   message.textContent = `Refresh interval changed to ${refreshOptions.find(o => o.value === newInterval)?.label}`
@@ -314,10 +355,8 @@ const changeRefreshInterval = async (newInterval: number) => {
   setTimeout(() => message.remove(), 2000)
 }
 
-// Toggle refresh settings dropdown
 const toggleRefreshSettings = () => {
   showRefreshSettings.value = !showRefreshSettings.value
-  // Close after 3 seconds
   if (showRefreshSettings.value) {
     setTimeout(() => {
       showRefreshSettings.value = false
@@ -325,7 +364,7 @@ const toggleRefreshSettings = () => {
   }
 }
 
-// Manual refresh with loading indicator
+// Manual refresh
 const manualRefresh = async () => {
   loading.value = true
   if (createdID.value.token) {
@@ -333,6 +372,7 @@ const manualRefresh = async () => {
   }
   loading.value = false
 }
+
 
 // Watch for refresh interval changes
 watch(refreshInterval, () => {
@@ -349,17 +389,45 @@ onMounted(() => {
   axiosInstance.post('/upload-create', { computerID: lordStore.db.id })
     .then(response => {
       createdID.value = response.data
-      qrText.value = `http://localhost:3000/upload/${createdID.value.computerID}?token=${createdID.value.token}`
+      qrText.value = `http://80.225.220.97:3000/upload/${createdID.value.computerID}?token=${createdID.value.token}`
       saveToMain()
       startPolling()
     })
     .catch(error => {
       console.error('Error registering computer:', error)
     })
+
+  ipcRenderer.on('downloadProgress', (event, data: { percent: number, speed: number, file: ScannerFileData }) => {
+    const index = files.value.findIndex(f => f.id === data.file.id)
+    if (index !== -1) {
+      files.value[index].downloadProgress = data.percent
+      files.value[index].downloadSpeed = data.speed
+      // Trigger reactivity
+      files.value = [...files.value]
+    }
+  })
+
+  // Listen for download completion
+  ipcRenderer.on('downloadComplete', (event, data: { file: ScannerFileData, downloadedAt: string }) => {
+    const index = files.value.findIndex(f => f.id === data.file.id)
+    if (index !== -1) {
+      files.value[index].downloadedAt = data.downloadedAt
+      files.value[index].downloadProgress = undefined
+      files.value[index].downloadSpeed = undefined
+      files.value = [...files.value]
+
+      // Show notification
+      showMessage(`${data.file.fileName} downloaded successfully`, 'success')
+    }
+  })
+
+
 })
 
 onUnmounted(() => {
   stopPolling()
+  ipcRenderer.removeAllListeners('downloadProgress')
+  ipcRenderer.removeAllListeners('downloadComplete')
 })
 </script>
 
@@ -372,37 +440,6 @@ onUnmounted(() => {
         | 📱 Scanner File Manager
       p.text-gray-600
         | Manage and track all your scanned files
-
-    // Stats Cards
-    .grid.grid-cols-1.gap-4.mb-8(class="sm:grid-cols-2 lg:grid-cols-4")
-      .bg-white.rounded-lg.p-4.shadow-md.transition-all.duration-300.hover.shadow-lg
-        .flex.items-center.justify-between
-          div
-            p.text-sm.text-gray-600 Total Files
-            p.text-2xl.font-bold.text-gray-900 {{ files.length }}
-          .rounded-full.bg-blue-100.p-3
-            File.text-blue-600.w-6.h-6
-      .bg-white.rounded-lg.p-4.shadow-md.transition-all.duration-300.hover.shadow-lg
-        .flex.items-center.justify-between
-          div
-            p.text-sm.text-gray-600 Total Size
-            p.text-2xl.font-bold.text-gray-900 {{ formatFileSize(totalSize) }}
-          .rounded-full.bg-green-100.p-3
-            HardDrive.text-green-600.w-6.h-6
-      .bg-white.rounded-lg.p-4.shadow-md.transition-all.duration-300.hover.shadow-lg
-        .flex.items-center.justify-between
-          div
-            p.text-sm.text-gray-600 Downloaded
-            p.text-2xl.font-bold.text-green-600 {{ downloadedFiles }}
-          .rounded-full.bg-green-100.p-3
-            CheckCircle.text-green-600.w-6.h-6
-      .bg-white.rounded-lg.p-4.shadow-md.transition-all.duration-300.hover.shadow-lg
-        .flex.items-center.justify-between
-          div
-            p.text-sm.text-gray-600 Pending
-            p.text-2xl.font-bold.text-yellow-600 {{ pendingFiles }}
-          .rounded-full.bg-yellow-100.p-3
-            Clock.text-yellow-600.w-6.h-6
 
     // QR Code and Connection Status
     .grid.grid-cols-1.gap-6.mb-8(class="lg:grid-cols-2")
@@ -442,7 +479,6 @@ onUnmounted(() => {
                 span.text-xs.font-mono {{ currentRefreshOption.label }}
                 Settings.w-4.h-4.text-gray-600
               
-              // Refresh settings dropdown
               .absolute.top-full.right-0.mt-2.bg-white.rounded-lg.shadow-xl.border.border-gray-200.z-50(
                 v-if="showRefreshSettings"
                 style="min-width: 180px"
@@ -460,6 +496,24 @@ onUnmounted(() => {
                         span {{ option.icon }}
                         span {{ option.label }}
                       span(v-if="refreshInterval === option.value") ✓
+          .flex.items-center.justify-between
+            span.text-sm.text-gray-600 Pending
+            span.inline-flex.items-center.gap-2
+              span.text-sm.text-yellow-600 {{ pendingFiles }}
+              .rounded-full.bg-yellow-100
+                Clock.text-yellow-600.w-4.h-4
+          .flex.items-center.justify-between
+            span.text-sm.text-gray-600 Downloaded
+            span.inline-flex.items-center.gap-2
+              span.text-sm.text-green-600 {{ downloadedFiles }}
+              .rounded-full.bg-green-100
+                CheckCircle.text-green-600.w-4.h-4
+          .flex.items-center.justify-between
+            span.text-sm.text-gray-600 Total Size
+            span.inline-flex.items-center.gap-2
+              span.text-sm.text-gray-900 {{ formatFileSize(totalSize) }}
+              .rounded-full.bg-green-100
+                HardDrive.text-green-600.w-4.h-4
 
     // Files Table Section
     .bg-white.rounded-xl.shadow-lg.overflow-hidden
@@ -528,8 +582,25 @@ onUnmounted(() => {
               td.px-6.py-4.whitespace-nowrap
                 .text-sm.text-gray-900 {{ formatDate(file.uploadedAt) }}
               td.px-6.py-4.whitespace-nowrap
-                span.px-2.py-1.text-xs.rounded-full.font-medium(:class="getStatusColor(file.downloadedAt)")
-                |  {{ getStatusText(file.downloadedAt) }}
+                // Download progress bar for active downloads
+                div(v-if="(file.downloadProgress !== undefined && file.downloadProgress < 100)")
+                  .flex.flex-col.gap-1(class="min-w-[150px]")
+                    .flex.items-center.justify-between.text-xs
+                      span.text-blue-600
+                        | ⬇️ Downloading
+                        span.text-green-600.ml-1(v-if="file.downloadProgress") {{ file.downloadProgress }}%
+                      span.text-gray-500.font-mono
+                        | {{ file.downloadSpeed ? formatFileSize(file.downloadSpeed) + '/s' : '0 B/s' }}
+                    .w-full.bg-gray-200.rounded-full.h-2.overflow-hidden
+                      .bg-gradient-to-r.from-blue-500.to-green-500.h-2.rounded-full.transition-all.duration-300(
+                        :style="{ width: `${file.downloadProgress}%` }"
+                      )
+                    .flex.justify-between.text-xs.text-gray-400
+                      span Elapsed: {{ formatTime(file.downloadProgress ? (Date.now() - new Date(file.uploadedAt).getTime()) / 1000 : 0) }}
+                      span ETA: {{ calculateETA(file.fileSize, file.downloadSpeed, file.downloadProgress) }}
+                // Completed/Pending status
+                span(v-else).px-2.py-1.text-xs.rounded-full.font-medium(:class="getStatusColor(file.downloadedAt)")
+                  | {{ getStatusText(file.downloadedAt) }}
               td.px-6.py-4.whitespace-nowrap
                 .flex.gap-2
                   button.p-1.text-blue-600.hover.text-blue-800.transition-colors(
@@ -599,6 +670,7 @@ onUnmounted(() => {
     // Footer
     .mt-8.text-center.text-xs.text-gray-500
       p Scanner File Manager v1.0 • Auto-refreshes every {{ currentRefreshOption.label }}
+pre {{ files }}
 </template>
 
 <style scoped>

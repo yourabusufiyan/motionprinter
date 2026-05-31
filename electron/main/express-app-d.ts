@@ -163,7 +163,7 @@ export type Scanner = {
     createdAt: string,
     updatedAt: string,
   },
-  refreshInterval: number,
+  refreshInterval?: number,
   files?: ScannerFileData[] | null,
 }
 

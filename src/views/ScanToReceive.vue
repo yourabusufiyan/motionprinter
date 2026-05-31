@@ -1,12 +1,15 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import VueQr from 'vue-qr'
-import { Trash2Icon, Printer, File, Search, FileText, RefreshCw, Eye, HardDrive, Clock, CheckCircle, Settings } from 'lucide-vue-next'
+import { Trash2Icon, Printer, File, Search, FileText, RefreshCw, Eye, HardDrive, Clock, CheckCircle, Settings, Download, Loader, Link2, Check, Share2 } from 'lucide-vue-next'
 import axios from 'axios'
 import { useLordStore } from '@/stores/LordStore'
-import { findIndex } from 'lodash'
+import { findIndex, isUndefined } from 'lodash'
 import { ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron/renderer'
+
+import { toast } from 'vue-sonner';
+import { Skeleton } from '@/components/ui/skeleton'
 
 type CreateResponse = {
   success: boolean
@@ -47,6 +50,7 @@ const lastUpdated = ref('')
 const updating = ref(false)
 const showRefreshSettings = ref(false)
 const refreshInterval = ref(5000)
+const copiedQrLink = ref(false)
 let intervalId: any = null
 
 // Refresh interval options
@@ -180,11 +184,79 @@ const getStatusText = (downloadedAt: string | null) => {
   return downloadedAt ? 'Downloaded' : 'Pending'
 }
 
+// Copy QR Code Link
+const copyQrLink = async () => {
+  if (!qrText.value) {
+    toast.error('QR code not available yet', {
+      description: 'Please wait for QR code to generate',
+      position: 'top-right',
+    })
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(qrText.value)
+    copiedQrLink.value = true
+    toast.success('QR Code link copied to clipboard!', {
+      description: 'Share this link with others to upload files',
+      position: 'top-right',
+    })
+
+    // Reset the copied state after 2 seconds
+    setTimeout(() => {
+      copiedQrLink.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy link:', err)
+    toast.error('Failed to copy link', {
+      description: 'Please try again',
+      position: 'top-right',
+    })
+  }
+}
+
+// Share QR Code link (Web Share API)
+const shareQrLink = async () => {
+  if (!qrText.value) {
+    toast.error('QR code not available yet', {
+      description: 'Please wait for QR code to generate',
+      position: 'top-right',
+    })
+    return
+  }
+
+  // Check if Web Share API is available
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Upload Files',
+        text: 'Scan this QR code or click the link to upload files',
+        url: qrText.value,
+      })
+      toast.success('Shared successfully!', {
+        position: 'top-right',
+      })
+    } catch (err) {
+      console.error('Error sharing:', err)
+    }
+  } else {
+    // Fallback to copy
+    await copyQrLink()
+  }
+}
+
 // File actions
 const printFile = (file: ScannerFileData) => {
   if (file.filePath) {
     const printWindow = window.open(file.filePath, '_blank')
     printWindow?.print()
+  }
+}
+
+// File actions
+const downloadFile = (file: ScannerFileData) => {
+  if (file.filePath) {
+    ipcRenderer.send('download-file', { fileUrl: `http://${lordStore.db.ip}:9457/scanner/${file.storedName}`, originalName: file.fileName, id: file.id })
   }
 }
 
@@ -373,7 +445,6 @@ const manualRefresh = async () => {
   loading.value = false
 }
 
-
 // Watch for refresh interval changes
 watch(refreshInterval, () => {
   if (isPolling.value) {
@@ -402,12 +473,10 @@ onMounted(() => {
     if (index !== -1) {
       files.value[index].downloadProgress = data.percent
       files.value[index].downloadSpeed = data.speed
-      // Trigger reactivity
       files.value = [...files.value]
     }
   })
 
-  // Listen for download completion
   ipcRenderer.on('downloadComplete', (event, data: { file: ScannerFileData, downloadedAt: string }) => {
     const index = files.value.findIndex(f => f.id === data.file.id)
     if (index !== -1) {
@@ -416,18 +485,49 @@ onMounted(() => {
       files.value[index].downloadSpeed = undefined
       files.value = [...files.value]
 
-      // Show notification
-      showMessage(`${data.file.fileName} downloaded successfully`, 'success')
+      toast.success(`Download completed: ${data.file.fileName.substring(0, 15) + (data.file.fileName.length > 15 ? '...' + data.file.fileName.split('.').reverse()[0].toString() : '')}`, {
+        description: data.file.fileName.substring(0, 20) + (data.file.fileName.length > 20 ? '...' + data.file.fileName.split('.').reverse()[0].toString() : ''),
+        position: 'top-right',
+      })
     }
   })
 
+  ipcRenderer.on('download-cancelled', (event, file: ScannerFileData) => {
+    console.log('Download cancelled for file:', file)
+    const index = files.value.find(f => f.id === file.id)
+    if (!isUndefined(index)) {
+      toast.error('Download was cancelled by the user.', {
+        description: index.storedName.substring(0, 20) + (index.storedName.length > 20 ? '...' + index.storedName.split('.').reverse()[0].toString() : ''),
+      })
+    }
+  })
 
+  ipcRenderer.on('download-success', (event, file: ScannerFileData) => {
+    const index = files.value.find(f => f.id === file.id)
+    if (!isUndefined(index)) {
+      toast.success(`Download completed successfully`, {
+        description: index.storedName.substring(0, 20) + (index.storedName.length > 20 ? '...' + index.storedName.split('.').reverse()[0].toString() : ''),
+      })
+    }
+  })
+
+  ipcRenderer.on('download-error', (event, file: ScannerFileData) => {
+    const index = files.value.find(f => f.id === file.id)
+    if (!isUndefined(index)) {
+      toast.error(`Download failed`, {
+        description: index.storedName.substring(0, 20) + (index.storedName.length > 20 ? '...' + index.storedName.split('.').reverse()[0].toString() : ''),
+      })
+    }
+  })
 })
 
 onUnmounted(() => {
   stopPolling()
   ipcRenderer.removeAllListeners('downloadProgress')
   ipcRenderer.removeAllListeners('downloadComplete')
+  ipcRenderer.removeAllListeners('download-cancelled')
+  ipcRenderer.removeAllListeners('download-success')
+  ipcRenderer.removeAllListeners('download-error')
 })
 </script>
 
@@ -445,33 +545,55 @@ onUnmounted(() => {
     .grid.grid-cols-1.gap-6.mb-8(class="lg:grid-cols-2")
       // QR Code Card
       .bg-white.rounded-xl.shadow-lg.p-6.text-center
-        h3.text-lg.font-semibold.text-gray-900.mb-4 Scan to Upload
+        .flex.items-center.justify-between.mb-4
+          h3.text-lg.font-semibold.text-gray-900 Scan to Upload
+          .flex.gap-2
+            button.p-2.text-gray-600.hover.text-gray-800.transition-colors(
+              @click="copyQrLink"
+              title="Copy QR Link"
+              class="rounded-lg hover:bg-gray-100"
+            )
+              Link2.w-5.h-5(v-if="!copiedQrLink")
+              Check.w-5.h-5.text-green-600(v-else)
+            button.p-2.text-gray-600.hover.text-gray-800.transition-colors(
+              @click="shareQrLink"
+              title="Share QR Link"
+              class="rounded-lg hover:bg-gray-100"
+            )
+              Share2.w-5.h-5
+        Skeleton.mx-auto.rounded-xl.shadow-md(class="w-[180px] h-[180px]" v-if="!qrText")
         vue-qr.mx-auto.bg-white.rounded-xl.shadow-md(
           :text="qrText"
           size="180"
-          v-if="qrText"
+          v-else
         )
         p.mt-4.text-sm.text-gray-600
-          | Scan this QR code with your mobile device to upload files
+          span(v-if="qrText") Scan this QR code or share the link to upload files
+          span(v-else) QR code is being generated...
+        .mt-3(v-if="qrText")
+          .text-xs.text-gray-500.break-all.bg-gray-50.p-2.rounded
+            | {{ qrText }}
 
       // Connection Status Card
-      .bg-white.rounded-xl.shadow-lg.p-6(v-if="createdID.token")
+      .bg-white.rounded-xl.shadow-lg.p-6
         h3.text-lg.font-semibold.text-gray-900.mb-4 Connection Status
         .space-y-3
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Computer ID
-            span.text-sm.font-mono.text-gray-900 {{ createdID.computerID }}
+            span.text-sm.font-mono.text-gray-900(v-if="createdID.token") {{ createdID.computerID }}
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Token
-            span.text-xs.font-mono.text-gray-900.break-all {{ createdID.token }}
+            span.text-xs.font-mono.text-gray-900.break-all(v-if="createdID.token") {{ createdID.token }}
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Status
             span.inline-flex.items-center.gap-2
-              .w-2.h-2.rounded-full.bg-green-500.animate-pulse
-              span.text-sm.text-green-600 Connected
+              .w-2.h-2.rounded-full.bg-green-500.animate-pulse(v-if="createdID.token")
+              span.text-sm.text-green-600(v-if="createdID.token") Connected
+              .w-2.h-2.rounded-full.bg-red-500.animate-pulse(v-if="!createdID.token")
+              span.text-sm.text-red-600(v-if="!createdID.token") Disconnected
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Auto-Refresh
-            .relative
+            .relative(v-if="createdID.token")
               button.inline-flex.items-center.gap-2.px-3.py-1.bg-gray-100.rounded-lg.hover.bg-gray-200.transition-colors(
                 @click="toggleRefreshSettings"
               )
@@ -498,19 +620,19 @@ onUnmounted(() => {
                       span(v-if="refreshInterval === option.value") ✓
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Pending
-            span.inline-flex.items-center.gap-2
+            span.inline-flex.items-center.gap-2(v-if="createdID.token")
               span.text-sm.text-yellow-600 {{ pendingFiles }}
               .rounded-full.bg-yellow-100
                 Clock.text-yellow-600.w-4.h-4
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Downloaded
-            span.inline-flex.items-center.gap-2
+            span.inline-flex.items-center.gap-2(v-if="createdID.token")
               span.text-sm.text-green-600 {{ downloadedFiles }}
               .rounded-full.bg-green-100
                 CheckCircle.text-green-600.w-4.h-4
           .flex.items-center.justify-between
             span.text-sm.text-gray-600 Total Size
-            span.inline-flex.items-center.gap-2
+            span.inline-flex.items-center.gap-2(v-if="createdID.token")
               span.text-sm.text-gray-900 {{ formatFileSize(totalSize) }}
               .rounded-full.bg-green-100
                 HardDrive.text-green-600.w-4.h-4
@@ -576,7 +698,7 @@ onUnmounted(() => {
                     span.text-xl {{ getFileIcon(file.mimeType) }}
                   div
                     .text-sm.font-medium.text-gray-900 {{ file.fileName }}
-                    .text-xs.text-gray-500 {{ file.mimeType }}
+                    .text-xs.text-gray-500 {{ file.mimeType }} {{ file?.description && '-' }} {{ file?.description || '' }}
               td.px-6.py-4.whitespace-nowrap
                 .text-sm.text-gray-900 {{ formatFileSize(file.fileSize) }}
               td.px-6.py-4.whitespace-nowrap
@@ -608,11 +730,11 @@ onUnmounted(() => {
                     title="Preview"
                   )
                     Eye.w-5.h-5
-                  button.p-1.text-green-600.hover.text-green-800.transition-colors(
-                    @click="printFile(file)"
-                    title="Print"
+                  button.p-1.text-gray-600.hover.text-gray-800.transition-colors(
+                    @click="downloadFile(file)"
+                    title="Download"
                   )
-                    Printer.w-5.h-5
+                    Download.w-5.h-5
                   button.p-1.text-red-600.hover.text-red-800.transition-colors(
                     @click="deleteFile(file)"
                     title="Delete"
@@ -670,7 +792,6 @@ onUnmounted(() => {
     // Footer
     .mt-8.text-center.text-xs.text-gray-500
       p Scanner File Manager v1.0 • Auto-refreshes every {{ currentRefreshOption.label }}
-pre {{ files }}
 </template>
 
 <style scoped>

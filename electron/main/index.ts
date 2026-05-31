@@ -46,7 +46,6 @@ process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
   : process.env.DIST;
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
-const autoLaunchArgs = ['--hidden'];
 const cleanupAutoLaunchArgs = [
   '--squirrel-uninstall',
   '--squirrel-obsolete',
@@ -60,7 +59,6 @@ function setAutoLaunch(openAtLogin: boolean) {
   app.setLoginItemSettings({
     openAtLogin,
     path: app.getPath('exe'),
-    args: autoLaunchArgs,
   });
 }
 

@@ -271,6 +271,7 @@ class expressAppClass {
     this.app.use('/upload/', express.static(this.dir[1]));
     this.app.use('/oropdf/', express.static(this.dir[4]));
     this.app.use('/temp/', express.static(this.dir[3]));
+    this.app.use('/scanner/', express.static(this.dir[5]));
     this.app.use('/api/v1/', this.router);
     this.app.use('/api/v1/oropdf/', this.oroPDF);
     this.app.use('/api/v1/oroscanner/', this.oroScanner);
@@ -479,6 +480,7 @@ class expressAppClass {
             response.data.pipe(writer);
 
             await new Promise((resolve, reject) => {
+              // @ts-ignore
               writer.on('finish', resolve);
               writer.on('error', reject);
             });
@@ -978,7 +980,7 @@ class expressAppClass {
 
       // Check if PDF is password protected
       let result = await checkProtected(uploadPath);
-      console.log('check Prtected', result)
+      console.log('check Protected', result)
       let pageCount = 0;
 
       // Create file record

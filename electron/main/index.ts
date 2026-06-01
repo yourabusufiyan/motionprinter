@@ -46,6 +46,7 @@ process.env.PUBLIC = process.env.VITE_DEV_SERVER_URL
   : process.env.DIST;
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
+const autoLaunchArgs = ['--hidden'];
 const cleanupAutoLaunchArgs = [
   '--squirrel-uninstall',
   '--squirrel-obsolete',
@@ -59,6 +60,7 @@ function setAutoLaunch(openAtLogin: boolean) {
   app.setLoginItemSettings({
     openAtLogin,
     path: app.getPath('exe'),
+    args: autoLaunchArgs,
   });
 }
 
@@ -92,10 +94,20 @@ app.on('before-quit', () => {
   isQuitting = true;
 });
 
+app.on('web-contents-created', (_, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url).catch((error) => {
+      console.error(`Failed to open external URL: ${url}`, error);
+    });
+    return { action: 'deny' };
+  });
+});
+
 // Here, you can also use other preload
 const preload = path.join(__dirname, '../preload/index.js');
 const url = process.env.VITE_DEV_SERVER_URL;
 const indexHtml = path.join(process.env.DIST, 'index.html');
+const appIcon = path.join(process.env.PUBLIC, 'icon.ico');
 
 const dir = [
   path.join(os.homedir(), app.getName(), '/public/'),
@@ -118,14 +130,65 @@ if (!process.env.VITE_DEV_SERVER_URL) {
   Menu.setApplicationMenu(null);
 }
 
+function hasMainWindow() {
+  return !!win && !win.isDestroyed();
+}
+
+async function showWindow() {
+  if (!hasMainWindow()) {
+    await createWindow();
+    return;
+  }
+
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+function createTray() {
+  if (tray && !tray.isDestroyed()) return;
+
+  tray = new Tray(appIcon);
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App',
+      click: showWindow,
+    },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setToolTip('OroPrinter');
+  tray.setContextMenu(contextMenu);
+  tray.on('click', () => {
+    if (hasMainWindow() && win.isVisible()) {
+      win.hide();
+    } else {
+      void showWindow();
+    }
+  });
+}
+
 async function createWindow() {
+  if (hasMainWindow()) {
+    await showWindow();
+    return;
+  }
+
   if (!expressAppClass.isServerRunning) {
     expressAppClass.startServer();
   }
 
-  win = new BrowserWindow({
+  createTray();
+
+  const mainWindow = new BrowserWindow({
     title: 'Main window',
-    icon: path.join(process.env.PUBLIC, 'favicon.ico'),
+    icon: appIcon,
     width: 1220,
     height: 600,
     show: !isHiddenLaunch,
@@ -140,64 +203,43 @@ async function createWindow() {
       webSecurity: false,
     },
   });
+  win = mainWindow;
 
   if (process.env.VITE_DEV_SERVER_URL) {
     // electron-vite-vue#298
-    win.loadURL(url);
+    mainWindow.loadURL(url);
     // Open devTool if the app is not packaged
-    win.webContents.openDevTools();
+    mainWindow.webContents.openDevTools();
   } else {
-    win.loadFile(indexHtml);
-    win.setMenuBarVisibility(false);
+    mainWindow.loadFile(indexHtml);
+    mainWindow.setMenuBarVisibility(false);
   }
 
-  expressAppClass.win = win;
+  expressAppClass.win = mainWindow;
 
-  // Create a tray icon
-  tray = new Tray(path.join(process.env.PUBLIC, 'favicon.ico')); // Replace with your icon path
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show App',
-      click: () => win?.show(),
-    },
-    {
-      label: 'Quit',
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
-    },
-  ]);
-  tray.setToolTip('OroPrinter'); // Tooltip for the tray icon
-  tray.setContextMenu(contextMenu);
-
-  // Handle tray icon click
-  tray.on('click', () => {
-    if (win?.isVisible()) {
-      win?.hide();
-    } else {
-      win?.show();
-      win?.focus();
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault(); // Prevent the window from closing
+      mainWindow.hide(); // Hide the window instead
     }
   });
 
-  win.on('close', (event) => {
-    if (!isQuitting) {
-      event.preventDefault(); // Prevent the window from closing
-      win?.hide(); // Hide the window instead
+  mainWindow.on('closed', () => {
+    if (win === mainWindow) {
+      win = null;
+    }
+    if (expressAppClass.win === mainWindow) {
+      expressAppClass.win = null;
     }
   });
 
   // Test actively push message to the Electron-Renderer
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', new Date().toLocaleString());
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('main-process-message', new Date().toLocaleString());
+    }
   });
 
-  // Make all links open with the browser, not with the application
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https:')) shell.openExternal(url);
-    return { action: 'deny' };
-  });
 }
 
 app.whenReady().then(createWindow);
@@ -207,21 +249,12 @@ app.on('window-all-closed', () => {
 });
 
 app.on('second-instance', () => {
-  if (win) {
-    // Focus on the main window if the user tried to open another
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
-  }
+  // Focus on the existing window if the app is already running in the tray.
+  void showWindow();
 });
 
 app.on('activate', () => {
-  const allWindows = BrowserWindow.getAllWindows();
-  if (allWindows.length) {
-    allWindows[0].focus();
-  } else {
-    createWindow();
-  }
+  void showWindow();
 });
 
 // New window example arg: new windows url

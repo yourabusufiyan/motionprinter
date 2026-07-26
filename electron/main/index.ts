@@ -140,9 +140,11 @@ async function showWindow() {
     return;
   }
 
-  if (win.isMinimized()) win.restore();
-  win.show();
-  win.focus();
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
 }
 
 function createTray() {
@@ -166,10 +168,12 @@ function createTray() {
   tray.setToolTip('OroPrinter');
   tray.setContextMenu(contextMenu);
   tray.on('click', () => {
-    if (hasMainWindow() && win.isVisible()) {
-      win.hide();
-    } else {
-      void showWindow();
+    if (win && !win.isDestroyed()) {
+      if (hasMainWindow() && win.isVisible()) {
+        win.hide();
+      } else {
+        void showWindow();
+      }
     }
   });
 }
@@ -788,15 +792,15 @@ ipcMain.on('cardMaker', async (event, page: cardMaker) => {
               backCropOptions.width = 1270;
               backCropOptions.height = 638;
             } else if (card.cardType == 'voter_new') {
-              frontCropOptions.left = 136;
-              frontCropOptions.top = 396;
-              frontCropOptions.width = 1019;
-              frontCropOptions.height = 640;
+              frontCropOptions.left = 529;
+              frontCropOptions.top = 1541;
+              frontCropOptions.width = 3966;
+              frontCropOptions.height = 2491;
 
-              backCropOptions.left = 1363;
-              backCropOptions.top = 396;
-              backCropOptions.width = 1019;
-              backCropOptions.height = 640;
+              backCropOptions.left = 5300;
+              backCropOptions.top = 1541;
+              backCropOptions.width = 3966;
+              backCropOptions.height = 2491;
             } else if (card.cardType == 'abc_apaar' && card.abcTo == 'abc') {
               frontCropOptions.left = 589;
               frontCropOptions.top = 15;
